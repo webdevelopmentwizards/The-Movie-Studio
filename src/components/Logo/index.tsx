@@ -3,9 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { CDN_ASSETS_BASE } from "@/constants/cdn";
 import { markHeroAudioUnlocked } from "@/utils/heroAudio";
 
-const LOGO_SRC = "/assets/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png";
+const LOGO_SRC = `${CDN_ASSETS_BASE}/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png`;
 
 interface LogoProps {
   className?: string;

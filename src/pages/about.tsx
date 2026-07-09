@@ -1,6 +1,8 @@
 import Head from "next/head";
 import Image from "next/image";
 
+import { CDN_ASSETS_BASE } from "@/constants/cdn";
+
 export default function About() {
   return (
     <>
@@ -15,7 +17,7 @@ export default function About() {
       <section className="border-b border-zinc-800 bg-black py-12 md:py-16">
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
           <Image
-            src="/assets/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png"
+            src={`${CDN_ASSETS_BASE}/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png`}
             alt="The Movie Studio"
             width={1280}
             height={256}
@@ -30,7 +32,7 @@ export default function About() {
           <div className="order-2 w-full space-y-3 lg:order-1">
             <div className="relative mx-auto h-52 w-full max-w-[480px] overflow-hidden rounded-2xl border border-zinc-800 bg-black">
               <Image
-                src="/assets/aboutusimage.jpeg"
+                src={`${CDN_ASSETS_BASE}/aboutusimage.jpeg`}
                 alt="The Movie Studio production set"
                 fill
                 sizes="(max-width: 1024px) 100vw, 40vw"
@@ -71,7 +73,7 @@ export default function About() {
             </div>
             <div className="mx-auto w-full max-w-[340px] overflow-hidden rounded-2xl border border-zinc-800 bg-black">
               <Image
-                src="/assets/movies.png"
+                src={`${CDN_ASSETS_BASE}/movies.png`}
                 alt="The Movie Studio film catalog"
                 width={411}
                 height={613}
@@ -180,7 +182,7 @@ export default function About() {
           <div className="mt-8">
             <div className="relative mb-4 aspect-square w-full overflow-hidden rounded-2xl border border-zinc-800 bg-black sm:float-left sm:mr-8 sm:w-[280px]">
               <Image
-                src="/assets/ceo.png"
+                src={`${CDN_ASSETS_BASE}/ceo.png`}
                 alt="Gordon Scott Venters, President - CEO"
                 fill
                 sizes="(max-width: 640px) 100vw, 280px"

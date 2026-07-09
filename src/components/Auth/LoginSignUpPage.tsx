@@ -14,7 +14,9 @@ import {
   UserIcon,
 } from "./icons";
 
-const LOGO_SRC = "/assets/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png";
+import { CDN_ASSETS_BASE } from "@/constants/cdn";
+
+const LOGO_SRC = `${CDN_ASSETS_BASE}/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png`;
 
 const TRUST_POINTS = [
   "Exclusive independent films & series",

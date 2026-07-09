@@ -6,7 +6,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pm2:start": "pm2 start ecosystem.config.cjs --env production",
+    "pm2:stop": "pm2 stop movie-studio",
+    "pm2:restart": "pm2 restart movie-studio --env production",
+    "pm2:delete": "pm2 delete movie-studio",
+    "pm2:logs": "pm2 logs movie-studio",
+    "pm2:status": "pm2 status",
+    "pm2:deploy": "npm run build && pm2 startOrRestart ecosystem.config.cjs --env production"
   },
   "dependencies": {
     "next": "16.2.9",

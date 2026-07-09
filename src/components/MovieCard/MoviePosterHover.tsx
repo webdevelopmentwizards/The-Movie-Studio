@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import BehindTheScenesButton from "@/components/BehindTheScenesButton";
 import WatchTrailerLink from "@/components/WatchTrailerButton/WatchTrailerLink";
 import type { Movie } from "@/types/movie";
 
@@ -34,8 +35,9 @@ export default function MoviePosterHover({
       <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-zinc-950/80 via-transparent to-transparent opacity-80" />
       <div className="pointer-events-none absolute inset-0 z-20 bg-black/60 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
-      <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+      <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 px-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
         {movie.trailer && <WatchTrailerLink href={`${href}?trailer=1`} compact />}
+        <BehindTheScenesButton compact />
       </div>
 
       {showRating && (
