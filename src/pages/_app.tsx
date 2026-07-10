@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import { useEffect } from "react";
 
 import PageLayout from "@/layout";
+import ChatAssistant from "@/components/ChatAssistant";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -47,6 +48,7 @@ export default function App({ Component, pageProps }: AppProps) {
         <PageLayout showHeader={showChrome} showFooter={showChrome}>
           <Component {...pageProps} />
         </PageLayout>
+        {showChrome && <ChatAssistant />}
       </div>
     </>
   );

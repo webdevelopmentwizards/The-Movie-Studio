@@ -1,5 +1,7 @@
 "use client";
 
+import { THE_MOVIE_STUDIO_YOUTUBE_URL } from "@/constants/links";
+
 import YouTubeIcon from "./YouTubeIcon";
 
 interface BehindTheScenesButtonProps {
@@ -20,13 +22,15 @@ export default function BehindTheScenesButton({
   className = "",
 }: BehindTheScenesButtonProps) {
   return (
-    <button
-      type="button"
+    <a
+      href={THE_MOVIE_STUDIO_YOUTUBE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
       className={`${behindTheScenesButtonClass(compact)} ${className}`}
     >
       <YouTubeIcon compact={compact} />
       {behindTheScenesLabel(compact)}
-    </button>
+    </a>
   );
 }

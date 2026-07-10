@@ -2,6 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 
 import HeroBanner from "@/components/HeroBanner";
+import HomeAuditionCTA from "@/components/HomeAuditionCTA";
 import HomeAboutSection from "@/components/HomeAboutSection";
 import HomeContactSection from "@/components/HomeContactSection";
 import MovieSwiper from "@/components/MovieSwiper";
@@ -28,6 +29,8 @@ export default function Home() {
       </Head>
 
       <HeroBanner slides={heroSlides} />
+
+      <HomeAuditionCTA />
 
       <HomeContactSection />
 
