@@ -170,6 +170,11 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
   const stepIndex = STEPS.indexOf(step);
   const isLastStep = step === "subscription";
 
+  const isContinueDisabled =
+    (step === "video" && !videoFile) ||
+    (step === "photo" && !photoFile) ||
+    (isLastStep && !selectedPlan);
+
   if (!isOpen) return null;
 
   return (
@@ -235,6 +240,11 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                 Upload your audition video — perform the dialogue you just read
                 and show us what you&apos;ve got.
               </p>
+              {!videoFile && (
+                <p className="text-xs text-amber-400/80">
+                  A video upload is required to continue.
+                </p>
+              )}
               <UploadZone
                 accept="video/*"
                 label="Drop your video here or click to browse"
@@ -251,6 +261,11 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                 Add a headshot or profile photo so our casting team can put a
                 face to your performance.
               </p>
+              {!photoFile && (
+                <p className="text-xs text-amber-400/80">
+                  A photo upload is required to continue.
+                </p>
+              )}
               <UploadZone
                 accept="image/*"
                 label="Drop your photo here or click to browse"
@@ -321,7 +336,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
           <button
             type="button"
             onClick={isLastStep ? resetAndClose : goNext}
-            disabled={isLastStep && !selectedPlan}
+            disabled={isContinueDisabled}
             className="rounded-full bg-amber-500 px-6 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isLastStep ? "Complete Submission" : "Continue"}
