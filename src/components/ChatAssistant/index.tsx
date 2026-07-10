@@ -164,12 +164,13 @@ export default function ChatAssistant() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/25 transition-transform hover:scale-105 hover:bg-amber-400 sm:bottom-6 sm:right-6"
+          className="fixed bottom-5 right-5 z-50 flex h-14 items-center justify-center gap-2 rounded-full bg-amber-500 px-5 text-zinc-950 shadow-lg shadow-amber-500/25 transition-transform hover:scale-105 hover:bg-amber-400 sm:bottom-6 sm:right-6"
           aria-label="Open chat assistant"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6" aria-hidden>
             <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.2L4 17.2V4h16v12z" />
           </svg>
+          <span className="text-sm font-bold">How may I help you?</span>
         </button>
       )}
 
