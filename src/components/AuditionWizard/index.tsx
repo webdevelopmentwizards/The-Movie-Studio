@@ -6,6 +6,8 @@ type WizardStep = "dialogue" | "video" | "photo" | "subscription";
 
 type SubscriptionPlan = "monthly" | "yearly";
 
+type DialogueGender = "him" | "her";
+
 const STEPS: WizardStep[] = ["dialogue", "video", "photo", "subscription"];
 
 const STEP_LABELS: Record<WizardStep, string> = {
@@ -15,7 +17,18 @@ const STEP_LABELS: Record<WizardStep, string> = {
   subscription: "Choose Plan",
 };
 
-const DUMMY_DIALOGUE = `"I've waited my whole life for this moment. The lights, the camera, the chance to prove I'm more than just a dreamer standing in the shadows. Every rejection, every late night, every doubt — they all led me here. So take a breath, find your truth, and when they call action… give them everything you've got."`;
+const AMERICAN_DREAM_DIALOGUES: Record<DialogueGender, string[]> = {
+  him: [
+    `(chuckling) — "I don't know about special, but I do my best. And it's a pleasure to meet you. You sure talk about you a lot — especially your music."`,
+    `I know a little something about music (smiles) maybe I can help you.`,
+  ],
+  her: [
+    `Look, "The life just kicked me in the teeth." The Music business is hard! Look. The only chance you have is to be authentic. Sit tight. I'll show you how to kick back.`,
+    `Grins and pulls a few crumpled pieces of paper and looks at them.`,
+    `You see, it's all about the song, the story, you know the lyrics, then the melody and then the hook!`,
+    `You know, if your soul can't spill it, you won't kill it!`,
+  ],
+};
 
 const SUBSCRIPTION_PLANS = [
   {
@@ -122,6 +135,7 @@ function UploadZone({
 
 export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps) {
   const [step, setStep] = useState<WizardStep>("dialogue");
+  const [dialogueGender, setDialogueGender] = useState<DialogueGender>("him");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
@@ -147,11 +161,15 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
 
   function resetAndClose() {
     setStep("dialogue");
+    setDialogueGender("him");
     setVideoFile(null);
     setPhotoFile(null);
     setSelectedPlan(null);
     onClose();
   }
+
+  const activeDialogueLines = AMERICAN_DREAM_DIALOGUES[dialogueGender];
+
 
   function goNext() {
     const index = STEPS.indexOf(step);
@@ -217,14 +235,48 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
           {step === "dialogue" && (
             <div className="space-y-5">
               <p className="text-sm leading-relaxed text-zinc-400">
-                Read the scene below, memorize your lines, and record yourself
-                performing this monologue. This is your moment — bring the
+                Choose your scene, read the lines below, memorize them, and
+                record yourself performing. This is your moment — bring the
                 character to life.
               </p>
+
+              <div
+                className="flex rounded-full border border-zinc-800 bg-zinc-900/80 p-1"
+                role="tablist"
+                aria-label="Dialogue version"
+              >
+                {(
+                  [
+                    { id: "him", label: "For Him" },
+                    { id: "her", label: "For Her" },
+                  ] as const
+                ).map((tab) => {
+                  const isActive = dialogueGender === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isActive}
+                      onClick={() => setDialogueGender(tab.id)}
+                      className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                        isActive
+                          ? "bg-amber-500 text-zinc-950"
+                          : "text-zinc-400 hover:text-zinc-200"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
               <blockquote className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6">
-                <p className="font-serif text-base italic leading-relaxed text-zinc-200 sm:text-lg">
-                  {DUMMY_DIALOGUE}
-                </p>
+                <div className="space-y-4 font-serif text-base italic leading-relaxed text-zinc-200 sm:text-lg">
+                  {activeDialogueLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
               </blockquote>
               <p className="text-xs text-zinc-500">
                 Tip: Find a quiet space, look into the camera, and deliver the

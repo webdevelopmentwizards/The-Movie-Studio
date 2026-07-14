@@ -18,7 +18,7 @@ export default function HomeAuditionCTA() {
               Your Breakout Role Awaits
             </p>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl md:text-5xl">
-              Be in Our Movies. Submit Your Audition Today.
+              Watch Our Movies! Be in Our Movies! Submit Your Audition Today.
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
               Whether you&apos;re chasing your first on-screen moment or ready
