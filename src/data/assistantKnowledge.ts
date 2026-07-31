@@ -74,7 +74,7 @@ ${movieTitles}
 - **Movies (/movies)** — Full catalog of all films
 - **Movie detail (/movies/[slug])** — Poster, synopsis, genres, trailer button, "Live on Location / Behind the Scenes" YouTube link, related films
 - **About (/about)** — Company history, brand, CEO bio, stock info, contact address
-- **Contact (/contact)** — Contact form, office address, email, phone, hours
+- **Contact (/contact)** — Contact form (emails the studio via Microsoft 365), office address, email, phone, hours
 - **Login (/login)** & **Signup (/signup)** — Account access
 - **Privacy Policy (/privacy-policy)** & **Terms (/terms)**
 
@@ -95,6 +95,7 @@ ${movieTitles}
 - On the homepage below the hero, users can click **"Start Your Audition"**
 - 4-step wizard: (1) Read & memorize a sample monologue, (2) Upload audition video, (3) Upload headshot photo, (4) Choose subscription plan
 - **Subscription plans:** $8.99/month OR $9.99/year (yearly is best value)
+- Payments are processed securely via Kurv (card lightbox on the plan step)
 - Purpose: Submit audition to be considered for casting in The Movie Studio films
 
 ## HERO BANNER SLIDES

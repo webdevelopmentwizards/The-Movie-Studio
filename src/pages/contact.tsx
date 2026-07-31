@@ -5,12 +5,54 @@ import { FormEvent, useState } from "react";
 
 import PageHero from "@/components/PageHero";
 
-export default function Contact() {
-  const [submitted, setSubmitted] = useState(false);
+type SubmitState = "idle" | "submitting" | "success" | "error";
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+export default function Contact() {
+  const [status, setStatus] = useState<SubmitState>("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    if (status === "submitting") return;
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+
+    setStatus("submitting");
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(formData.get("name") || ""),
+          email: String(formData.get("email") || ""),
+          subject: String(formData.get("subject") || ""),
+          message: String(formData.get("message") || ""),
+          company: String(formData.get("company") || ""),
+        }),
+      });
+
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Unable to send your message.");
+      }
+
+      setStatus("success");
+      form.reset();
+    } catch (error) {
+      setStatus("error");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to send your message. Please try again.",
+      );
+    }
   }
 
   return (
@@ -32,21 +74,44 @@ export default function Contact() {
       <section className="bg-zinc-950 py-12 md:py-20">
         <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:gap-12 sm:px-6 lg:grid-cols-5">
           <div className="lg:col-span-3">
-            {submitted ? (
+            {status === "success" ? (
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 text-center sm:p-10">
                 <p className="text-xl font-semibold text-amber-400 sm:text-2xl">
                   Message sent!
                 </p>
                 <p className="mt-3 text-zinc-400">
                   Thank you for reaching out. We&apos;ll get back to you within
-                  2 business days.
+                  2 business days. A confirmation was also sent to your email.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setStatus("idle")}
+                  className="mt-6 rounded-full border border-amber-500/40 px-6 py-2.5 text-sm font-semibold text-amber-400 transition-colors hover:bg-amber-500/10"
+                >
+                  Send another message
+                </button>
               </div>
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5 sm:space-y-6 sm:p-8"
+                className="relative space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/30 p-5 sm:space-y-6 sm:p-8"
+                noValidate
               >
+                {/* Honeypot — hidden from real users */}
+                <div
+                  aria-hidden="true"
+                  className="absolute -left-[9999px] top-auto h-0 w-0 overflow-hidden"
+                >
+                  <label htmlFor="company">Company</label>
+                  <input
+                    id="company"
+                    name="company"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                  />
+                </div>
+
                 <div className="grid gap-6 sm:grid-cols-2">
                   <div>
                     <label
@@ -60,7 +125,9 @@ export default function Contact() {
                       name="name"
                       type="text"
                       required
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500"
+                      maxLength={120}
+                      disabled={status === "submitting"}
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500 disabled:opacity-60"
                       placeholder="John Doe"
                     />
                   </div>
@@ -76,7 +143,9 @@ export default function Contact() {
                       name="email"
                       type="email"
                       required
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500"
+                      maxLength={254}
+                      disabled={status === "submitting"}
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500 disabled:opacity-60"
                       placeholder="you@example.com"
                     />
                   </div>
@@ -92,9 +161,13 @@ export default function Contact() {
                     id="subject"
                     name="subject"
                     required
-                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500"
+                    disabled={status === "submitting"}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500 disabled:opacity-60"
+                    defaultValue=""
                   >
-                    <option value="">Select a topic</option>
+                    <option value="" disabled>
+                      Select a topic
+                    </option>
                     <option value="general">General Inquiry</option>
                     <option value="partnership">Partnership</option>
                     <option value="press">Press & Media</option>
@@ -113,15 +186,29 @@ export default function Contact() {
                     name="message"
                     required
                     rows={6}
-                    className="w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500"
+                    maxLength={5000}
+                    minLength={10}
+                    disabled={status === "submitting"}
+                    className="w-full resize-none rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors focus:border-amber-500 disabled:opacity-60"
                     placeholder="Tell us how we can help..."
                   />
                 </div>
+
+                {errorMessage && (
+                  <p
+                    role="alert"
+                    className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+                  >
+                    {errorMessage}
+                  </p>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full rounded-full bg-amber-500 py-3.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 sm:w-auto sm:px-10"
+                  disabled={status === "submitting"}
+                  className="w-full rounded-full bg-amber-500 py-3.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-10"
                 >
-                  Send Message
+                  {status === "submitting" ? "Sending…" : "Send Message"}
                 </button>
               </form>
             )}

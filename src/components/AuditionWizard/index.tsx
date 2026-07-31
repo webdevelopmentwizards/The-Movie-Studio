@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import {
+  AUDITION_PLANS,
+  type AuditionPlanId,
+} from "@/lib/kurv";
+import type { CollectJsTokenResponse } from "@/types/collectjs";
 
 type WizardStep = "dialogue" | "video" | "photo" | "subscription";
-
-type SubscriptionPlan = "monthly" | "yearly";
-
-type DialogueGender = "him" | "her";
 
 const STEPS: WizardStep[] = ["dialogue", "video", "photo", "subscription"];
 
@@ -17,36 +19,15 @@ const STEP_LABELS: Record<WizardStep, string> = {
   subscription: "Choose Plan",
 };
 
-const AMERICAN_DREAM_DIALOGUES: Record<DialogueGender, string[]> = {
-  him: [
-    `(chuckling) — "I don't know about special, but I do my best. And it's a pleasure to meet you. You sure talk about you a lot — especially your music."`,
-    `I know a little something about music (smiles) maybe I can help you.`,
-  ],
-  her: [
-    `Look, "The life just kicked me in the teeth." The Music business is hard! Look. The only chance you have is to be authentic. Sit tight. I'll show you how to kick back.`,
-    `Grins and pulls a few crumpled pieces of paper and looks at them.`,
-    `You see, it's all about the song, the story, you know the lyrics, then the melody and then the hook!`,
-    `You know, if your soul can't spill it, you won't kill it!`,
-  ],
-};
+const DUMMY_DIALOGUE = `"I've waited my whole life for this moment. The lights, the camera, the chance to prove I'm more than just a dreamer standing in the shadows. Every rejection, every late night, every doubt — they all led me here. So take a breath, find your truth, and when they call action… give them everything you've got."`;
+
+const COLLECT_JS_SRC =
+  "https://kurv.transactiongateway.com/token/Collect.js";
 
 const SUBSCRIPTION_PLANS = [
-  {
-    id: "monthly" as const,
-    name: "Monthly",
-    price: "$8.99",
-    period: "per month",
-    description: "Perfect for trying out auditions and submitting your first scenes.",
-  },
-  {
-    id: "yearly" as const,
-    name: "Yearly",
-    price: "$9.99",
-    period: "per year",
-    description: "Best value — stay in the spotlight all year long.",
-    badge: "Best Value",
-  },
-];
+  AUDITION_PLANS.monthly,
+  AUDITION_PLANS.yearly,
+] as const;
 
 interface AuditionWizardProps {
   isOpen: boolean;
@@ -133,12 +114,162 @@ function UploadZone({
   );
 }
 
+function loadCollectJs(tokenizationKey: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${COLLECT_JS_SRC}"]`,
+    );
+    if (existing && window.CollectJS) {
+      resolve();
+      return;
+    }
+
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Collect.js")),
+        { once: true },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = COLLECT_JS_SRC;
+    script.async = true;
+    script.dataset.tokenizationKey = tokenizationKey;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Collect.js"));
+    document.head.appendChild(script);
+  });
+}
+
 export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps) {
   const [step, setStep] = useState<WizardStep>("dialogue");
-  const [dialogueGender, setDialogueGender] = useState<DialogueGender>("him");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<AuditionPlanId | null>(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [zip, setZip] = useState("");
+  const [isCollectReady, setIsCollectReady] = useState(false);
+  const [isPaying, setIsPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  const billingRef = useRef({
+    firstName: "",
+    lastName: "",
+    email: "",
+    zip: "",
+    planId: null as AuditionPlanId | null,
+  });
+
+  useEffect(() => {
+    billingRef.current = {
+      firstName,
+      lastName,
+      email,
+      zip,
+      planId: selectedPlan,
+    };
+  }, [firstName, lastName, email, zip, selectedPlan]);
+
+  const processPayment = useCallback(async (token: string) => {
+    const billing = billingRef.current;
+    if (!billing.planId) {
+      setPaymentError("Please select a plan.");
+      return;
+    }
+
+    setIsPaying(true);
+    setPaymentError(null);
+
+    try {
+      const response = await fetch("/api/audition/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paymentToken: token,
+          planId: billing.planId,
+          firstName: billing.firstName.trim(),
+          lastName: billing.lastName.trim(),
+          email: billing.email.trim(),
+          zip: billing.zip.trim() || undefined,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        ok: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Payment failed.");
+      }
+
+      setPaymentSuccess(true);
+      setPaymentError(null);
+    } catch (error) {
+      setPaymentError(
+        error instanceof Error ? error.message : "Payment failed.",
+      );
+    } finally {
+      setIsPaying(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || step !== "subscription") return;
+
+    const tokenizationKey = process.env.NEXT_PUBLIC_KURV_TOKENIZATION_KEY;
+    if (!tokenizationKey) {
+      setPaymentError(
+        "Payment is not configured. Add NEXT_PUBLIC_KURV_TOKENIZATION_KEY.",
+      );
+      setIsCollectReady(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    loadCollectJs(tokenizationKey)
+      .then(() => {
+        if (cancelled || !window.CollectJS) return;
+
+        window.CollectJS.configure({
+          paymentType: "cc",
+          theme: "bootstrap",
+          primaryColor: "#f59e0b",
+          secondaryColor: "#18181b",
+          buttonText: "Pay securely",
+          instructionText: "Enter your card details",
+          // Avoid auto-binding a #payButton; we call startPaymentRequest manually.
+          paymentSelector: "#kurv-collect-trigger",
+          callback: (response: CollectJsTokenResponse) => {
+            if (!response?.token) {
+              setPaymentError("Could not tokenize card. Please try again.");
+              return;
+            }
+            void processPayment(response.token);
+          },
+        });
+
+        setIsCollectReady(true);
+        setPaymentError(null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsCollectReady(false);
+          setPaymentError("Unable to load secure payment form.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, step, processPayment]);
 
   useEffect(() => {
     if (isOpen) {
@@ -153,23 +284,27 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && !isPaying) onClose();
     }
     if (isOpen) window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isPaying]);
 
   function resetAndClose() {
+    if (isPaying) return;
     setStep("dialogue");
-    setDialogueGender("him");
     setVideoFile(null);
     setPhotoFile(null);
     setSelectedPlan(null);
+    setFirstName("");
+    setLastName("");
+    setEmail("");
+    setZip("");
+    setPaymentError(null);
+    setPaymentSuccess(false);
+    setIsPaying(false);
     onClose();
   }
-
-  const activeDialogueLines = AMERICAN_DREAM_DIALOGUES[dialogueGender];
-
 
   function goNext() {
     const index = STEPS.indexOf(step);
@@ -185,13 +320,48 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     }
   }
 
+  function validateBilling(): string | null {
+    if (!selectedPlan) return "Please select a plan.";
+    if (!firstName.trim() || !lastName.trim()) {
+      return "Enter your first and last name.";
+    }
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return "Enter a valid email address.";
+    }
+    if (!isCollectReady || !window.CollectJS) {
+      return "Payment form is still loading. Please wait a moment.";
+    }
+    return null;
+  }
+
+  function startCheckout() {
+    const error = validateBilling();
+    if (error) {
+      setPaymentError(error);
+      return;
+    }
+
+    setPaymentError(null);
+    // Opens Kurv Collect.js lightbox; charge runs only after a token is returned.
+    window.CollectJS?.startPaymentRequest();
+  }
+
   const stepIndex = STEPS.indexOf(step);
   const isLastStep = step === "subscription";
+  const selectedPlanDetails = selectedPlan
+    ? AUDITION_PLANS[selectedPlan]
+    : null;
 
   const isContinueDisabled =
     (step === "video" && !videoFile) ||
     (step === "photo" && !photoFile) ||
-    (isLastStep && !selectedPlan);
+    (isLastStep &&
+      (!selectedPlan ||
+        !firstName.trim() ||
+        !lastName.trim() ||
+        !email.trim() ||
+        isPaying ||
+        paymentSuccess));
 
   if (!isOpen) return null;
 
@@ -220,7 +390,8 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
             <button
               type="button"
               onClick={resetAndClose}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-zinc-300 transition-colors hover:border-amber-500 hover:text-amber-400"
+              disabled={isPaying}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-zinc-300 transition-colors hover:border-amber-500 hover:text-amber-400 disabled:opacity-50"
               aria-label="Close"
             >
               ✕
@@ -235,48 +406,14 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
           {step === "dialogue" && (
             <div className="space-y-5">
               <p className="text-sm leading-relaxed text-zinc-400">
-                Choose your scene, read the lines below, memorize them, and
-                record yourself performing. This is your moment — bring the
+                Read the scene below, memorize your lines, and record yourself
+                performing this monologue. This is your moment — bring the
                 character to life.
               </p>
-
-              <div
-                className="flex rounded-full border border-zinc-800 bg-zinc-900/80 p-1"
-                role="tablist"
-                aria-label="Dialogue version"
-              >
-                {(
-                  [
-                    { id: "him", label: "For Him" },
-                    { id: "her", label: "For Her" },
-                  ] as const
-                ).map((tab) => {
-                  const isActive = dialogueGender === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={isActive}
-                      onClick={() => setDialogueGender(tab.id)}
-                      className={`flex-1 rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                        isActive
-                          ? "bg-amber-500 text-zinc-950"
-                          : "text-zinc-400 hover:text-zinc-200"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
-
               <blockquote className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 sm:p-6">
-                <div className="space-y-4 font-serif text-base italic leading-relaxed text-zinc-200 sm:text-lg">
-                  {activeDialogueLines.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
-                </div>
+                <p className="font-serif text-base italic leading-relaxed text-zinc-200 sm:text-lg">
+                  {DUMMY_DIALOGUE}
+                </p>
               </blockquote>
               <p className="text-xs text-zinc-500">
                 Tip: Find a quiet space, look into the camera, and deliver the
@@ -330,49 +467,142 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
 
           {step === "subscription" && (
             <div className="space-y-5">
-              <p className="text-sm text-zinc-400">
-                Choose a plan to submit your audition and unlock access to
-                casting calls, workshops, and opportunities to appear in our
-                films.
-              </p>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {SUBSCRIPTION_PLANS.map((plan) => {
-                  const isSelected = selectedPlan === plan.id;
+              {paymentSuccess ? (
+                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-6 text-center">
+                  <p className="text-lg font-bold text-emerald-400">
+                    Payment successful
+                  </p>
+                  <p className="mt-2 text-sm text-zinc-300">
+                    Your {selectedPlanDetails?.name.toLowerCase()} audition plan
+                    is active. We&apos;ll review your submission soon.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-zinc-400">
+                    Choose a plan, enter your billing details, then pay securely
+                    with Kurv to submit your audition.
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {SUBSCRIPTION_PLANS.map((plan) => {
+                      const isSelected = selectedPlan === plan.id;
 
-                  return (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => setSelectedPlan(plan.id)}
-                      className={`relative rounded-xl border p-5 text-left transition-all ${
-                        isSelected
-                          ? "border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/50"
-                          : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
-                      }`}
-                    >
-                      {"badge" in plan && plan.badge && (
-                        <span className="absolute -top-2.5 right-4 rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-950">
-                          {plan.badge}
-                        </span>
-                      )}
-                      <p className="text-sm font-semibold text-zinc-300">
-                        {plan.name}
-                      </p>
-                      <p className="mt-2 flex items-baseline gap-1">
-                        <span className="text-3xl font-bold text-zinc-50">
-                          {plan.price}
-                        </span>
-                        <span className="text-sm text-zinc-500">
-                          {plan.period}
-                        </span>
-                      </p>
-                      <p className="mt-3 text-xs leading-relaxed text-zinc-500">
-                        {plan.description}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
+                      return (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => setSelectedPlan(plan.id)}
+                          disabled={isPaying}
+                          className={`relative rounded-xl border p-5 text-left transition-all disabled:opacity-60 ${
+                            isSelected
+                              ? "border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/50"
+                              : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"
+                          }`}
+                        >
+                          {"badge" in plan && plan.badge && (
+                            <span className="absolute -top-2.5 right-4 rounded-full bg-amber-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-950">
+                              {plan.badge}
+                            </span>
+                          )}
+                          <p className="text-sm font-semibold text-zinc-300">
+                            {plan.name}
+                          </p>
+                          <p className="mt-2 flex items-baseline gap-1">
+                            <span className="text-3xl font-bold text-zinc-50">
+                              {plan.priceLabel}
+                            </span>
+                            <span className="text-sm text-zinc-500">
+                              {plan.period}
+                            </span>
+                          </p>
+                          <p className="mt-3 text-xs leading-relaxed text-zinc-500">
+                            {plan.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-zinc-400">
+                        First name
+                      </span>
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        disabled={isPaying}
+                        autoComplete="given-name"
+                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                      />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-zinc-400">
+                        Last name
+                      </span>
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        disabled={isPaying}
+                        autoComplete="family-name"
+                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                      />
+                    </label>
+                    <label className="block space-y-1.5 sm:col-span-2">
+                      <span className="text-xs font-medium text-zinc-400">
+                        Email
+                      </span>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        disabled={isPaying}
+                        autoComplete="email"
+                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                      />
+                    </label>
+                    <label className="block space-y-1.5 sm:col-span-2">
+                      <span className="text-xs font-medium text-zinc-400">
+                        ZIP / Postal code (optional)
+                      </span>
+                      <input
+                        type="text"
+                        value={zip}
+                        onChange={(e) => setZip(e.target.value)}
+                        disabled={isPaying}
+                        autoComplete="postal-code"
+                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Hidden trigger so Collect.js does not hijack our primary CTA */}
+                  <button
+                    type="button"
+                    id="kurv-collect-trigger"
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+
+                  {paymentError && (
+                    <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                      {paymentError}
+                    </p>
+                  )}
+
+                  <p className="text-xs text-zinc-500">
+                    Card details are collected securely by Kurv and never touch
+                    our servers. You&apos;ll be charged{" "}
+                    {selectedPlanDetails
+                      ? `${selectedPlanDetails.priceLabel} ${selectedPlanDetails.period}`
+                      : "after selecting a plan"}
+                    .
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -380,19 +610,34 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-zinc-800 px-5 py-4 sm:px-6">
           <button
             type="button"
-            onClick={stepIndex === 0 ? resetAndClose : goBack}
-            className="rounded-full border border-zinc-700 px-5 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100"
+            onClick={
+              paymentSuccess
+                ? resetAndClose
+                : stepIndex === 0
+                  ? resetAndClose
+                  : goBack
+            }
+            disabled={isPaying}
+            className="rounded-full border border-zinc-700 px-5 py-2.5 text-sm font-semibold text-zinc-300 transition-colors hover:border-zinc-600 hover:text-zinc-100 disabled:opacity-50"
           >
-            {stepIndex === 0 ? "Cancel" : "Back"}
+            {paymentSuccess || stepIndex === 0 ? "Close" : "Back"}
           </button>
-          <button
-            type="button"
-            onClick={isLastStep ? resetAndClose : goNext}
-            disabled={isContinueDisabled}
-            className="rounded-full bg-amber-500 px-6 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isLastStep ? "Complete Submission" : "Continue"}
-          </button>
+          {!paymentSuccess && (
+            <button
+              type="button"
+              onClick={isLastStep ? startCheckout : goNext}
+              disabled={isContinueDisabled || (isLastStep && !isCollectReady)}
+              className="rounded-full bg-amber-500 px-6 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isLastStep
+                ? isPaying
+                  ? "Processing…"
+                  : selectedPlanDetails
+                    ? `Pay ${selectedPlanDetails.priceLabel}`
+                    : "Pay & Submit"
+                : "Continue"}
+            </button>
+          )}
         </div>
       </div>
     </div>
