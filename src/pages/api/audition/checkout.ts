@@ -1,27 +1,25 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { promises as fs } from "fs";
-import path from "path";
 import { IncomingForm, type File as FormidableFile } from "formidable";
 
-import { AUDITION_PLANS, type AuditionPlanId } from "@/lib/auditionPlans";
 import {
-  AUDITION_MAX_UPLOAD_BYTES,
-  AUDITION_MAX_UPLOAD_MB,
+  AUDITION_MAX_PHOTO_BYTES,
+  AUDITION_MAX_PHOTO_MB,
+  AUDITION_MAX_VIDEO_BYTES,
+  AUDITION_MAX_VIDEO_MB,
 } from "@/lib/auditionLimits";
+import { AUDITION_PLANS, type AuditionPlanId } from "@/lib/auditionPlans";
 import {
   chargeAuditionPayment,
   isAuthorizeNetConfigured,
 } from "@/lib/authorizenet";
-import {
-  isMailConfigured,
-  sendAuditionPaymentEmails,
-  type AuditionMailAttachment,
-} from "@/lib/mail";
+import { isMailConfigured, sendAuditionPaymentEmails } from "@/lib/mail";
+import { isMinioConfigured, uploadAuditionFile } from "@/lib/minio";
 
 export const config = {
   api: {
     bodyParser: false,
-    sizeLimit: `${AUDITION_MAX_UPLOAD_MB * 2}mb`,
+    sizeLimit: `${AUDITION_MAX_VIDEO_MB + AUDITION_MAX_PHOTO_MB}mb`,
   },
 };
 
@@ -30,6 +28,8 @@ type CheckoutSuccess = {
   transactionId: string;
   planId: AuditionPlanId;
   amount: string;
+  videoUrl?: string;
+  photoUrl?: string;
 };
 
 type CheckoutError = {
@@ -57,8 +57,8 @@ function parseForm(req: NextApiRequest): Promise<{
   const form = new IncomingForm({
     multiples: false,
     keepExtensions: true,
-    maxFileSize: AUDITION_MAX_UPLOAD_BYTES,
-    maxTotalFileSize: AUDITION_MAX_UPLOAD_BYTES * 2,
+    maxFileSize: AUDITION_MAX_VIDEO_BYTES,
+    maxTotalFileSize: AUDITION_MAX_VIDEO_BYTES + AUDITION_MAX_PHOTO_BYTES,
   });
 
   return new Promise((resolve, reject) => {
@@ -79,35 +79,6 @@ function parseForm(req: NextApiRequest): Promise<{
   });
 }
 
-async function fileToAttachment(
-  file: FormidableFile | null,
-  fallbackName: string,
-): Promise<AuditionMailAttachment> {
-  if (!file?.filepath) {
-    throw new Error(`${fallbackName} is required.`);
-  }
-
-  const filename = file.originalFilename || fallbackName;
-  const contentType = file.mimetype || undefined;
-  const size = file.size ?? 0;
-
-  if (size <= 0 || size > AUDITION_MAX_UPLOAD_BYTES) {
-    throw new Error(
-      `${filename} must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`,
-    );
-  }
-
-  const buffer = await fs.readFile(file.filepath);
-
-  const uploadRoot = path.join(process.cwd(), "uploads", "auditions");
-  await fs.mkdir(uploadRoot, { recursive: true });
-  const safeName = `${Date.now()}-${filename.replace(/[^\w.\-]+/g, "_")}`;
-  const savedPath = path.join(uploadRoot, safeName);
-  await fs.writeFile(savedPath, buffer);
-
-  return { filename, content: buffer, contentType };
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse<CheckoutSuccess | CheckoutError>,
@@ -121,6 +92,13 @@ export default async function handler(
       ok: false,
       error:
         "Payment is not configured. Add AUTHORIZENET_API_LOGIN_ID and AUTHORIZENET_TRANSACTION_KEY.",
+    });
+  }
+
+  if (!isMinioConfigured()) {
+    return res.status(503).json({
+      ok: false,
+      error: "File storage is not configured. Add MinIO environment variables.",
     });
   }
 
@@ -175,21 +153,16 @@ export default async function handler(
 
   const videoSize = video.size ?? 0;
   const photoSize = photo.size ?? 0;
-  if (
-    videoSize <= 0 ||
-    photoSize <= 0 ||
-    videoSize > AUDITION_MAX_UPLOAD_BYTES ||
-    photoSize > AUDITION_MAX_UPLOAD_BYTES
-  ) {
+  if (videoSize <= 0 || videoSize > AUDITION_MAX_VIDEO_BYTES) {
     return res.status(400).json({
       ok: false,
-      error: `Each file must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`,
+      error: `Video must be ${AUDITION_MAX_VIDEO_MB}MB or smaller.`,
     });
   }
-  if (videoSize + photoSize > AUDITION_MAX_UPLOAD_BYTES) {
+  if (photoSize <= 0 || photoSize > AUDITION_MAX_PHOTO_BYTES) {
     return res.status(400).json({
       ok: false,
-      error: `Video and photo together must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`,
+      error: `Photo must be ${AUDITION_MAX_PHOTO_MB}MB or smaller.`,
     });
   }
 
@@ -204,8 +177,21 @@ export default async function handler(
     });
 
     const plan = AUDITION_PLANS[planId];
-    const videoAttachment = await fileToAttachment(video, "audition-video");
-    const photoAttachment = await fileToAttachment(photo, "audition-photo.jpg");
+
+    const [videoUpload, photoUpload] = await Promise.all([
+      uploadAuditionFile({
+        localPath: video.filepath,
+        originalFilename: video.originalFilename || "audition-video.mp4",
+        contentType: video.mimetype,
+        kind: "video",
+      }),
+      uploadAuditionFile({
+        localPath: photo.filepath,
+        originalFilename: photo.originalFilename || "audition-photo.jpg",
+        contentType: photo.mimetype,
+        kind: "photo",
+      }),
+    ]);
 
     if (isMailConfigured()) {
       try {
@@ -217,13 +203,13 @@ export default async function handler(
           amountLabel: plan.priceLabel,
           period: plan.period,
           transactionId: result.transactionId,
-          attachments: [videoAttachment, photoAttachment],
+          videoUrl: videoUpload.url,
+          photoUrl: photoUpload.url,
         });
       } catch (mailError) {
         const message =
           mailError instanceof Error ? mailError.message : "Mail failed";
         console.error("[audition/checkout] email failed:", message);
-        // Payment already succeeded — do not fail the user submission.
       }
     } else {
       console.warn(
@@ -231,7 +217,6 @@ export default async function handler(
       );
     }
 
-    // Cleanup formidable temp files
     await Promise.allSettled(
       [video.filepath, photo.filepath].map((filepath) =>
         filepath ? fs.unlink(filepath) : Promise.resolve(),
@@ -243,6 +228,8 @@ export default async function handler(
       transactionId: result.transactionId,
       planId,
       amount: plan.amount,
+      videoUrl: videoUpload.url,
+      photoUrl: photoUpload.url,
     });
   } catch (error) {
     const message =

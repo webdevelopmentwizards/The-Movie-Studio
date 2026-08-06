@@ -154,13 +154,10 @@ export type AuditionPaymentMailPayload = {
   amountLabel: string;
   period: string;
   transactionId: string;
-  attachments: AuditionMailAttachment[];
-  /** Paths/notes when a file was too large to attach */
-  attachmentNotes?: string[];
+  videoUrl: string;
+  photoUrl: string;
+  attachments?: AuditionMailAttachment[];
 };
-
-export { AUDITION_MAX_UPLOAD_BYTES as AUDITION_EMAIL_ATTACH_MAX_BYTES } from "@/lib/auditionLimits";
-
 
 export async function sendAuditionPaymentEmails(
   payload: AuditionPaymentMailPayload,
@@ -176,22 +173,16 @@ export async function sendAuditionPaymentEmails(
   const fullName = `${payload.firstName} ${payload.lastName}`.trim();
   const mailer = getTransporter();
 
-  const notesBlock =
-    payload.attachmentNotes && payload.attachmentNotes.length > 0
-      ? `<p><strong>Attachment notes:</strong></p><ul>${payload.attachmentNotes
-          .map((n) => `<li>${escapeHtml(n)}</li>`)
-          .join("")}</ul>`
-      : "";
-
   const studioHtml = `
     <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#18181b;">
       <h2 style="margin:0 0 16px;font-size:18px;">New paid audition submission</h2>
       <p style="margin:0 0 8px;"><strong>Name:</strong> ${escapeHtml(fullName)}</p>
       <p style="margin:0 0 8px;"><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
       <p style="margin:0 0 8px;"><strong>Plan:</strong> ${escapeHtml(payload.planName)} (${escapeHtml(payload.amountLabel)} ${escapeHtml(payload.period)})</p>
-      <p style="margin:0 0 16px;"><strong>Transaction ID:</strong> ${escapeHtml(payload.transactionId)}</p>
-      ${notesBlock}
-      <p style="margin:16px 0 0;font-size:12px;color:#71717a;">Audition video/photo attached when size allows.</p>
+      <p style="margin:0 0 8px;"><strong>Transaction ID:</strong> ${escapeHtml(payload.transactionId)}</p>
+      <p style="margin:0 0 8px;"><strong>Video:</strong> <a href="${escapeHtml(payload.videoUrl)}">${escapeHtml(payload.videoUrl)}</a></p>
+      <p style="margin:0 0 16px;"><strong>Photo:</strong> <a href="${escapeHtml(payload.photoUrl)}">${escapeHtml(payload.photoUrl)}</a></p>
+      <p style="margin:16px 0 0;font-size:12px;color:#71717a;">Files are stored on MinIO / CDN.</p>
     </div>
   `;
 
@@ -207,10 +198,11 @@ export async function sendAuditionPaymentEmails(
       `Email: ${payload.email}`,
       `Plan: ${payload.planName} (${payload.amountLabel} ${payload.period})`,
       `Transaction ID: ${payload.transactionId}`,
-      ...(payload.attachmentNotes || []),
+      `Video: ${payload.videoUrl}`,
+      `Photo: ${payload.photoUrl}`,
     ].join("\n"),
     html: studioHtml,
-    attachments: payload.attachments.map((file) => ({
+    attachments: (payload.attachments || []).map((file) => ({
       filename: file.filename,
       content: file.content,
       contentType: file.contentType,

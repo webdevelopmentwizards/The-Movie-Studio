@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 
 import { AUDITION_PLANS, type AuditionPlanId } from "@/lib/auditionPlans";
 import {
-  AUDITION_MAX_UPLOAD_BYTES,
-  AUDITION_MAX_UPLOAD_MB,
+  AUDITION_MAX_PHOTO_BYTES,
+  AUDITION_MAX_PHOTO_MB,
+  AUDITION_MAX_VIDEO_BYTES,
+  AUDITION_MAX_VIDEO_MB,
 } from "@/lib/auditionLimits";
 import type { AcceptJsResponse } from "@/types/acceptjs";
 
@@ -248,6 +250,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
   const [expMonth, setExpMonth] = useState("");
   const [expYear, setExpYear] = useState("");
   const [cvv, setCvv] = useState("");
+  const [rightsAccepted, setRightsAccepted] = useState(false);
   const [acceptReady, setAcceptReady] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -311,6 +314,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     setExpMonth("");
     setExpYear("");
     setCvv("");
+    setRightsAccepted(false);
     setPaymentError(null);
     setPaymentSuccess(false);
     setIsPaying(false);
@@ -323,16 +327,9 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       setVideoFile(null);
       return;
     }
-    if (file.size > AUDITION_MAX_UPLOAD_BYTES) {
+    if (file.size > AUDITION_MAX_VIDEO_BYTES) {
       setVideoFile(null);
-      setVideoError(`Video must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`);
-      return;
-    }
-    if (photoFile && file.size + photoFile.size > AUDITION_MAX_UPLOAD_BYTES) {
-      setVideoFile(null);
-      setVideoError(
-        `Video + photo together must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`,
-      );
+      setVideoError(`Video must be ${AUDITION_MAX_VIDEO_MB}MB or smaller.`);
       return;
     }
     setVideoFile(file);
@@ -344,16 +341,9 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       setPhotoFile(null);
       return;
     }
-    if (file.size > AUDITION_MAX_UPLOAD_BYTES) {
+    if (file.size > AUDITION_MAX_PHOTO_BYTES) {
       setPhotoFile(null);
-      setPhotoError(`Photo must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`);
-      return;
-    }
-    if (videoFile && file.size + videoFile.size > AUDITION_MAX_UPLOAD_BYTES) {
-      setPhotoFile(null);
-      setPhotoError(
-        `Video + photo together must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`,
-      );
+      setPhotoError(`Photo must be ${AUDITION_MAX_PHOTO_MB}MB or smaller.`);
       return;
     }
     setPhotoFile(file);
@@ -386,6 +376,9 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       return "Enter a valid expiration year (YY).";
     }
     if (!/^\d{3,4}$/.test(cvv)) return "Enter a valid CVV.";
+    if (!rightsAccepted) {
+      return "Please accept the publicity rights disclaimer to continue.";
+    }
     if (!acceptReady) return "Payment form is still loading. Please wait.";
     return null;
   }
@@ -474,6 +467,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
         !expMonth.trim() ||
         !expYear.trim() ||
         !cvv.trim() ||
+        !rightsAccepted ||
         isPaying ||
         paymentSuccess));
 
@@ -541,7 +535,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
               <UploadZone
                 accept="video/*"
                 label="Drop your video here or click to browse"
-                hint={`MP4, MOV, or WebM · Max ${AUDITION_MAX_UPLOAD_MB}MB total with photo`}
+                hint={`MP4, MOV, or WebM · Max ${AUDITION_MAX_VIDEO_MB}MB`}
                 fileName={videoFile?.name ?? null}
                 error={videoError}
                 onFileSelect={selectVideo}
@@ -558,7 +552,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
               <UploadZone
                 accept="image/*"
                 label="Drop your photo here or click to browse"
-                hint={`JPG, PNG, or WebP · Max ${AUDITION_MAX_UPLOAD_MB}MB total with video`}
+                hint={`JPG, PNG, or WebP · Max ${AUDITION_MAX_PHOTO_MB}MB`}
                 fileName={photoFile?.name ?? null}
                 error={photoError}
                 onFileSelect={selectPhoto}
@@ -750,6 +744,24 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                       {paymentError}
                     </p>
                   )}
+
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                    <input
+                      type="checkbox"
+                      checked={rightsAccepted}
+                      onChange={(e) => setRightsAccepted(e.target.checked)}
+                      disabled={isPaying}
+                      className="mt-1 h-4 w-4 shrink-0 rounded border-zinc-600 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span className="text-xs leading-relaxed text-zinc-400">
+                      I understand and agree that The Movie Studio website and
+                      The Movie Studio (and its affiliates) have the right to
+                      use my audition video, headshot, name, and related
+                      submission materials in any manner, anywhere, for
+                      publicity, marketing, promotional, casting, or related
+                      purposes, without further permission or compensation.
+                    </span>
+                  </label>
                 </>
               )}
             </div>

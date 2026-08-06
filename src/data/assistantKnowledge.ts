@@ -94,9 +94,10 @@ ${movieTitles}
 ## AUDITION / "BE IN OUR MOVIES" FEATURE
 - On the homepage below the hero, users can click **"Start Your Audition"**
 - 4-step wizard: (1) Read & memorize a sample monologue, (2) Upload audition video, (3) Upload headshot photo, (4) Choose a payment plan
-- **Payment plans:** $8.99/month OR $89.99/year (yearly is best value)
+- **Payment plans:** $9.99/month OR $89.99/year (yearly is best value)
 - Payments are processed securely via Authorize.net (Accept.js) on the plan step
 - Purpose: Submit audition to be considered for casting in The Movie Studio films
+- Before payment, users must accept a disclaimer granting The Movie Studio rights to use their audition materials for publicity/marketing anywhere
 
 ## HERO BANNER SLIDES
 ${heroSummary}

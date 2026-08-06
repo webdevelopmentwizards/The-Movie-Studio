@@ -131,11 +131,16 @@ export async function chargeAuditionPayment(
   assertOk(data.messages, "Transaction request failed.");
 
   const tx = data.transactionResponse;
-  const transId = tx?.transId?.trim() || "";
-  if (!tx || tx.responseCode !== "1" || !transId || transId === "0") {
+  const responseCode = String(tx?.responseCode ?? "").trim();
+  const transId = String(tx?.transId ?? "").trim();
+
+  // responseCode "1" = Approved (JSON may return number or string)
+  if (!tx || responseCode !== "1" || !transId || transId === "0") {
     const decline =
       tx?.errors?.[0]?.errorText ||
-      tx?.messages?.[0]?.description ||
+      (responseCode !== "1"
+        ? tx?.messages?.[0]?.description
+        : undefined) ||
       (transId === "0"
         ? "Authorize.net is in Test Mode (transaction ID 0). Turn OFF Test Mode in the merchant settings."
         : "Card was declined.");
@@ -144,7 +149,7 @@ export async function chargeAuditionPayment(
 
   return {
     transactionId: transId,
-    authCode: tx.authCode || "",
+    authCode: String(tx.authCode || ""),
   };
 }
 

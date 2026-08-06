@@ -4,8 +4,8 @@ export const AUDITION_PLANS = {
   monthly: {
     id: "monthly" as const,
     name: "Monthly",
-    amount: "8.99",
-    priceLabel: "$8.99",
+    amount: "9.99",
+    priceLabel: "$9.99",
     period: "per month",
     description:
       "Perfect for trying out auditions and submitting your first scenes.",
