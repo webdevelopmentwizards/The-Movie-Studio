@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
+import { AUDITION_PLANS, type AuditionPlanId } from "@/lib/auditionPlans";
 import {
-  AUDITION_PLANS,
-  type AuditionPlanId,
-} from "@/lib/kurv";
-import type { CollectJsTokenResponse } from "@/types/collectjs";
+  AUDITION_MAX_UPLOAD_BYTES,
+  AUDITION_MAX_UPLOAD_MB,
+} from "@/lib/auditionLimits";
+import type { AcceptJsResponse } from "@/types/acceptjs";
 
 type WizardStep = "dialogue" | "video" | "photo" | "subscription";
 
@@ -21,13 +22,117 @@ const STEP_LABELS: Record<WizardStep, string> = {
 
 const DUMMY_DIALOGUE = `"I've waited my whole life for this moment. The lights, the camera, the chance to prove I'm more than just a dreamer standing in the shadows. Every rejection, every late night, every doubt — they all led me here. So take a breath, find your truth, and when they call action… give them everything you've got."`;
 
-const COLLECT_JS_SRC =
-  "https://kurv.transactiongateway.com/token/Collect.js";
-
 const SUBSCRIPTION_PLANS = [
   AUDITION_PLANS.monthly,
   AUDITION_PLANS.yearly,
 ] as const;
+
+function acceptJsSrc(): string {
+  const env = (
+    process.env.NEXT_PUBLIC_AUTHORIZENET_ENV || "sandbox"
+  ).toLowerCase();
+  return env === "production"
+    ? "https://js.authorize.net/v1/Accept.js"
+    : "https://jstest.authorize.net/v1/Accept.js";
+}
+
+function loadAcceptJs(): Promise<void> {
+  const src = acceptJsSrc();
+  return new Promise((resolve, reject) => {
+    // Drop the opposite env script if it was loaded earlier in this tab.
+    document
+      .querySelectorAll(
+        'script[src="https://js.authorize.net/v1/Accept.js"], script[src="https://jstest.authorize.net/v1/Accept.js"]',
+      )
+      .forEach((node) => {
+        const el = node as HTMLScriptElement;
+        if (el.src !== src) el.remove();
+      });
+
+    if (window.Accept && document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+
+    // Force a fresh Accept global when switching sandbox/live in the same tab.
+    if (window.Accept) {
+      delete window.Accept;
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${src}"]`,
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Failed to load Accept.js")),
+        { once: true },
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Accept.js"));
+    document.head.appendChild(script);
+  });
+}
+
+function tokenizeCard(input: {
+  cardNumber: string;
+  month: string;
+  year: string;
+  cardCode: string;
+  zip?: string;
+  fullName: string;
+}): Promise<{ dataDescriptor: string; dataValue: string }> {
+  const apiLoginID = process.env.NEXT_PUBLIC_AUTHORIZENET_API_LOGIN_ID?.trim();
+  const clientKey = process.env.NEXT_PUBLIC_AUTHORIZENET_CLIENT_KEY?.trim();
+
+  if (!apiLoginID || !clientKey) {
+    return Promise.reject(
+      new Error(
+        "Payment is not configured. Add NEXT_PUBLIC_AUTHORIZENET_API_LOGIN_ID and NEXT_PUBLIC_AUTHORIZENET_CLIENT_KEY.",
+      ),
+    );
+  }
+
+  if (!window.Accept) {
+    return Promise.reject(new Error("Secure payment library is not ready."));
+  }
+
+  return new Promise((resolve, reject) => {
+    window.Accept!.dispatchData(
+      {
+        authData: { apiLoginID, clientKey },
+        cardData: {
+          cardNumber: input.cardNumber.replace(/\s+/g, ""),
+          month: input.month.padStart(2, "0"),
+          year: input.year.length === 2 ? `20${input.year}` : input.year,
+          cardCode: input.cardCode,
+          zip: input.zip || undefined,
+          fullName: input.fullName,
+        },
+      },
+      (response: AcceptJsResponse) => {
+        if (response.messages.resultCode === "Error" || !response.opaqueData) {
+          const text =
+            response.messages.message?.[0]?.text ||
+            "Unable to secure card details.";
+          reject(new Error(text));
+          return;
+        }
+        resolve({
+          dataDescriptor: response.opaqueData.dataDescriptor,
+          dataValue: response.opaqueData.dataValue,
+        });
+      },
+    );
+  });
+}
 
 interface AuditionWizardProps {
   isOpen: boolean;
@@ -84,12 +189,14 @@ function UploadZone({
   label,
   hint,
   fileName,
+  error,
   onFileSelect,
 }: {
   accept: string;
   label: string;
   hint: string;
   fileName: string | null;
+  error?: string | null;
   onFileSelect: (file: File | null) => void;
 }) {
   return (
@@ -110,158 +217,56 @@ function UploadZone({
           {fileName}
         </p>
       )}
+      {error && (
+        <p className="mt-3 text-xs text-red-300">{error}</p>
+      )}
     </label>
   );
 }
 
-function loadCollectJs(tokenizationKey: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      `script[src="${COLLECT_JS_SRC}"]`,
-    );
-    if (existing && window.CollectJS) {
-      resolve();
-      return;
-    }
+const inputClassName =
+  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-60";
 
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener(
-        "error",
-        () => reject(new Error("Failed to load Collect.js")),
-        { once: true },
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = COLLECT_JS_SRC;
-    script.async = true;
-    script.dataset.tokenizationKey = tokenizationKey;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Collect.js"));
-    document.head.appendChild(script);
-  });
+/** Groups card digits in 4s: 4111111111111111 → 4111 1111 1111 1111 */
+function formatCardNumber(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 16);
+  return digits.replace(/(\d{4})(?=\d)/g, "$1 ").trimEnd();
 }
 
 export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps) {
   const [step, setStep] = useState<WizardStep>("dialogue");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<AuditionPlanId | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [zip, setZip] = useState("");
-  const [isCollectReady, setIsCollectReady] = useState(false);
+  const [cardNumber, setCardNumber] = useState("");
+  const [expMonth, setExpMonth] = useState("");
+  const [expYear, setExpYear] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [acceptReady, setAcceptReady] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  const billingRef = useRef({
-    firstName: "",
-    lastName: "",
-    email: "",
-    zip: "",
-    planId: null as AuditionPlanId | null,
-  });
-
-  useEffect(() => {
-    billingRef.current = {
-      firstName,
-      lastName,
-      email,
-      zip,
-      planId: selectedPlan,
-    };
-  }, [firstName, lastName, email, zip, selectedPlan]);
-
-  const processPayment = useCallback(async (token: string) => {
-    const billing = billingRef.current;
-    if (!billing.planId) {
-      setPaymentError("Please select a plan.");
-      return;
-    }
-
-    setIsPaying(true);
-    setPaymentError(null);
-
-    try {
-      const response = await fetch("/api/audition/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          paymentToken: token,
-          planId: billing.planId,
-          firstName: billing.firstName.trim(),
-          lastName: billing.lastName.trim(),
-          email: billing.email.trim(),
-          zip: billing.zip.trim() || undefined,
-        }),
-      });
-
-      const data = (await response.json()) as {
-        ok: boolean;
-        error?: string;
-      };
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Payment failed.");
-      }
-
-      setPaymentSuccess(true);
-      setPaymentError(null);
-    } catch (error) {
-      setPaymentError(
-        error instanceof Error ? error.message : "Payment failed.",
-      );
-    } finally {
-      setIsPaying(false);
-    }
-  }, []);
-
   useEffect(() => {
     if (!isOpen || step !== "subscription") return;
 
-    const tokenizationKey = process.env.NEXT_PUBLIC_KURV_TOKENIZATION_KEY;
-    if (!tokenizationKey) {
-      setPaymentError(
-        "Payment is not configured. Add NEXT_PUBLIC_KURV_TOKENIZATION_KEY.",
-      );
-      setIsCollectReady(false);
-      return;
-    }
-
     let cancelled = false;
-
-    loadCollectJs(tokenizationKey)
+    loadAcceptJs()
       .then(() => {
-        if (cancelled || !window.CollectJS) return;
-
-        window.CollectJS.configure({
-          paymentType: "cc",
-          theme: "bootstrap",
-          primaryColor: "#f59e0b",
-          secondaryColor: "#18181b",
-          buttonText: "Pay securely",
-          instructionText: "Enter your card details",
-          // Avoid auto-binding a #payButton; we call startPaymentRequest manually.
-          paymentSelector: "#kurv-collect-trigger",
-          callback: (response: CollectJsTokenResponse) => {
-            if (!response?.token) {
-              setPaymentError("Could not tokenize card. Please try again.");
-              return;
-            }
-            void processPayment(response.token);
-          },
-        });
-
-        setIsCollectReady(true);
-        setPaymentError(null);
+        if (!cancelled) {
+          setAcceptReady(true);
+          setPaymentError(null);
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setIsCollectReady(false);
+          setAcceptReady(false);
           setPaymentError("Unable to load secure payment form.");
         }
       });
@@ -269,7 +274,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     return () => {
       cancelled = true;
     };
-  }, [isOpen, step, processPayment]);
+  }, [isOpen, step]);
 
   useEffect(() => {
     if (isOpen) {
@@ -295,29 +300,73 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     setStep("dialogue");
     setVideoFile(null);
     setPhotoFile(null);
+    setVideoError(null);
+    setPhotoError(null);
     setSelectedPlan(null);
     setFirstName("");
     setLastName("");
     setEmail("");
     setZip("");
+    setCardNumber("");
+    setExpMonth("");
+    setExpYear("");
+    setCvv("");
     setPaymentError(null);
     setPaymentSuccess(false);
     setIsPaying(false);
     onClose();
   }
 
+  function selectVideo(file: File | null) {
+    setVideoError(null);
+    if (!file) {
+      setVideoFile(null);
+      return;
+    }
+    if (file.size > AUDITION_MAX_UPLOAD_BYTES) {
+      setVideoFile(null);
+      setVideoError(`Video must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`);
+      return;
+    }
+    if (photoFile && file.size + photoFile.size > AUDITION_MAX_UPLOAD_BYTES) {
+      setVideoFile(null);
+      setVideoError(
+        `Video + photo together must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`,
+      );
+      return;
+    }
+    setVideoFile(file);
+  }
+
+  function selectPhoto(file: File | null) {
+    setPhotoError(null);
+    if (!file) {
+      setPhotoFile(null);
+      return;
+    }
+    if (file.size > AUDITION_MAX_UPLOAD_BYTES) {
+      setPhotoFile(null);
+      setPhotoError(`Photo must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`);
+      return;
+    }
+    if (videoFile && file.size + videoFile.size > AUDITION_MAX_UPLOAD_BYTES) {
+      setPhotoFile(null);
+      setPhotoError(
+        `Video + photo together must be ${AUDITION_MAX_UPLOAD_MB}MB or smaller.`,
+      );
+      return;
+    }
+    setPhotoFile(file);
+  }
+
   function goNext() {
     const index = STEPS.indexOf(step);
-    if (index < STEPS.length - 1) {
-      setStep(STEPS[index + 1]);
-    }
+    if (index < STEPS.length - 1) setStep(STEPS[index + 1]);
   }
 
   function goBack() {
     const index = STEPS.indexOf(step);
-    if (index > 0) {
-      setStep(STEPS[index - 1]);
-    }
+    if (index > 0) setStep(STEPS[index - 1]);
   }
 
   function validateBilling(): string | null {
@@ -328,22 +377,83 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       return "Enter a valid email address.";
     }
-    if (!isCollectReady || !window.CollectJS) {
-      return "Payment form is still loading. Please wait a moment.";
+    const number = cardNumber.replace(/\s+/g, "");
+    if (!/^\d{13,16}$/.test(number)) return "Enter a valid card number.";
+    if (!/^\d{1,2}$/.test(expMonth) || Number(expMonth) < 1 || Number(expMonth) > 12) {
+      return "Enter a valid expiration month (MM).";
     }
+    if (!/^\d{2}$/.test(expYear) && !/^\d{4}$/.test(expYear)) {
+      return "Enter a valid expiration year (YY).";
+    }
+    if (!/^\d{3,4}$/.test(cvv)) return "Enter a valid CVV.";
+    if (!acceptReady) return "Payment form is still loading. Please wait.";
     return null;
   }
 
-  function startCheckout() {
+  async function startCheckout() {
     const error = validateBilling();
     if (error) {
       setPaymentError(error);
       return;
     }
+    if (!selectedPlan) return;
 
     setPaymentError(null);
-    // Opens Kurv Collect.js lightbox; charge runs only after a token is returned.
-    window.CollectJS?.startPaymentRequest();
+    setIsPaying(true);
+
+    try {
+      const opaque = await tokenizeCard({
+        cardNumber,
+        month: expMonth,
+        year: expYear,
+        cardCode: cvv,
+        zip: zip.trim() || undefined,
+        fullName: `${firstName.trim()} ${lastName.trim()}`,
+      });
+
+      if (!videoFile || !photoFile) {
+        throw new Error("Audition video and photo are required.");
+      }
+
+      const formData = new FormData();
+      formData.append("dataDescriptor", opaque.dataDescriptor);
+      formData.append("dataValue", opaque.dataValue);
+      formData.append("planId", selectedPlan);
+      formData.append("firstName", firstName.trim());
+      formData.append("lastName", lastName.trim());
+      formData.append("email", email.trim());
+      if (zip.trim()) formData.append("zip", zip.trim());
+      formData.append("video", videoFile);
+      formData.append("photo", photoFile);
+
+      const response = await fetch("/api/audition/checkout", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = (await response.json()) as { ok: boolean; error?: string };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || "Payment failed.");
+      }
+
+      setPaymentSuccess(true);
+      setCardNumber("");
+      setCvv("");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Payment failed.";
+      const needsHttps =
+        /https/i.test(message) &&
+        typeof window !== "undefined" &&
+        window.location.protocol !== "https:";
+      setPaymentError(
+        needsHttps
+          ? "Authorize.net requires HTTPS. Stop the server and run: npm run dev:https — then open https://localhost:3000"
+          : message,
+      );
+    } finally {
+      setIsPaying(false);
+    }
   }
 
   const stepIndex = STEPS.indexOf(step);
@@ -360,6 +470,10 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
         !firstName.trim() ||
         !lastName.trim() ||
         !email.trim() ||
+        !cardNumber.trim() ||
+        !expMonth.trim() ||
+        !expYear.trim() ||
+        !cvv.trim() ||
         isPaying ||
         paymentSuccess));
 
@@ -415,11 +529,6 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                   {DUMMY_DIALOGUE}
                 </p>
               </blockquote>
-              <p className="text-xs text-zinc-500">
-                Tip: Find a quiet space, look into the camera, and deliver the
-                lines with emotion. You&apos;ll upload your recording on the
-                next step.
-              </p>
             </div>
           )}
 
@@ -429,17 +538,13 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                 Upload your audition video — perform the dialogue you just read
                 and show us what you&apos;ve got.
               </p>
-              {!videoFile && (
-                <p className="text-xs text-amber-400/80">
-                  A video upload is required to continue.
-                </p>
-              )}
               <UploadZone
                 accept="video/*"
                 label="Drop your video here or click to browse"
-                hint="MP4, MOV, or WebM · Max 500MB"
+                hint={`MP4, MOV, or WebM · Max ${AUDITION_MAX_UPLOAD_MB}MB total with photo`}
                 fileName={videoFile?.name ?? null}
-                onFileSelect={setVideoFile}
+                error={videoError}
+                onFileSelect={selectVideo}
               />
             </div>
           )}
@@ -450,17 +555,13 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                 Add a headshot or profile photo so our casting team can put a
                 face to your performance.
               </p>
-              {!photoFile && (
-                <p className="text-xs text-amber-400/80">
-                  A photo upload is required to continue.
-                </p>
-              )}
               <UploadZone
                 accept="image/*"
                 label="Drop your photo here or click to browse"
-                hint="JPG, PNG, or WebP · Clear, well-lit headshot preferred"
+                hint={`JPG, PNG, or WebP · Max ${AUDITION_MAX_UPLOAD_MB}MB total with video`}
                 fileName={photoFile?.name ?? null}
-                onFileSelect={setPhotoFile}
+                error={photoError}
+                onFileSelect={selectPhoto}
               />
             </div>
           )}
@@ -473,20 +574,20 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                     Payment successful
                   </p>
                   <p className="mt-2 text-sm text-zinc-300">
-                    Your {selectedPlanDetails?.name.toLowerCase()} audition plan
-                    is active. We&apos;ll review your submission soon.
+                    Your {selectedPlanDetails?.name.toLowerCase()}{" "}
+                    audition payment is complete. We&apos;ll review your
+                    submission soon.
                   </p>
                 </div>
               ) : (
                 <>
                   <p className="text-sm text-zinc-400">
-                    Choose a plan, enter your billing details, then pay securely
-                    with Kurv to submit your audition.
+                    Choose a plan and pay securely with Authorize.net to submit
+                    your audition.
                   </p>
                   <div className="grid gap-4 sm:grid-cols-2">
                     {SUBSCRIPTION_PLANS.map((plan) => {
                       const isSelected = selectedPlan === plan.id;
-
                       return (
                         <button
                           key={plan.id}
@@ -534,7 +635,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                         onChange={(e) => setFirstName(e.target.value)}
                         disabled={isPaying}
                         autoComplete="given-name"
-                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                        className={inputClassName}
                       />
                     </label>
                     <label className="block space-y-1.5">
@@ -547,7 +648,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                         onChange={(e) => setLastName(e.target.value)}
                         disabled={isPaying}
                         autoComplete="family-name"
-                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                        className={inputClassName}
                       />
                     </label>
                     <label className="block space-y-1.5 sm:col-span-2">
@@ -560,12 +661,78 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={isPaying}
                         autoComplete="email"
-                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                        className={inputClassName}
                       />
                     </label>
                     <label className="block space-y-1.5 sm:col-span-2">
                       <span className="text-xs font-medium text-zinc-400">
-                        ZIP / Postal code (optional)
+                        Card number
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="cc-number"
+                        value={cardNumber}
+                        onChange={(e) =>
+                          setCardNumber(formatCardNumber(e.target.value))
+                        }
+                        disabled={isPaying}
+                        placeholder="···· ···· ···· ····"
+                        maxLength={19}
+                        className={inputClassName}
+                      />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-zinc-400">
+                        Exp month (MM)
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="cc-exp-month"
+                        value={expMonth}
+                        onChange={(e) => setExpMonth(e.target.value)}
+                        disabled={isPaying}
+                        placeholder="12"
+                        maxLength={2}
+                        className={inputClassName}
+                      />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-zinc-400">
+                        Exp year (YY)
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="cc-exp-year"
+                        value={expYear}
+                        onChange={(e) => setExpYear(e.target.value)}
+                        disabled={isPaying}
+                        placeholder="27"
+                        maxLength={4}
+                        className={inputClassName}
+                      />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-zinc-400">
+                        CVV
+                      </span>
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="cc-csc"
+                        value={cvv}
+                        onChange={(e) => setCvv(e.target.value)}
+                        disabled={isPaying}
+                        placeholder="123"
+                        maxLength={4}
+                        className={inputClassName}
+                      />
+                    </label>
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-zinc-400">
+                        ZIP (optional)
                       </span>
                       <input
                         type="text"
@@ -573,34 +740,16 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                         onChange={(e) => setZip(e.target.value)}
                         disabled={isPaying}
                         autoComplete="postal-code"
-                        className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500"
+                        className={inputClassName}
                       />
                     </label>
                   </div>
-
-                  {/* Hidden trigger so Collect.js does not hijack our primary CTA */}
-                  <button
-                    type="button"
-                    id="kurv-collect-trigger"
-                    className="sr-only"
-                    tabIndex={-1}
-                    aria-hidden="true"
-                  />
 
                   {paymentError && (
                     <p className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
                       {paymentError}
                     </p>
                   )}
-
-                  <p className="text-xs text-zinc-500">
-                    Card details are collected securely by Kurv and never touch
-                    our servers. You&apos;ll be charged{" "}
-                    {selectedPlanDetails
-                      ? `${selectedPlanDetails.priceLabel} ${selectedPlanDetails.period}`
-                      : "after selecting a plan"}
-                    .
-                  </p>
                 </>
               )}
             </div>
@@ -625,8 +774,8 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
           {!paymentSuccess && (
             <button
               type="button"
-              onClick={isLastStep ? startCheckout : goNext}
-              disabled={isContinueDisabled || (isLastStep && !isCollectReady)}
+              onClick={isLastStep ? () => void startCheckout() : goNext}
+              disabled={isContinueDisabled || (isLastStep && !acceptReady)}
               className="rounded-full bg-amber-500 px-6 py-2.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLastStep

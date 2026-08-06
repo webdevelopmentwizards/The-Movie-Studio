@@ -93,9 +93,9 @@ ${movieTitles}
 
 ## AUDITION / "BE IN OUR MOVIES" FEATURE
 - On the homepage below the hero, users can click **"Start Your Audition"**
-- 4-step wizard: (1) Read & memorize a sample monologue, (2) Upload audition video, (3) Upload headshot photo, (4) Choose subscription plan
-- **Subscription plans:** $8.99/month OR $9.99/year (yearly is best value)
-- Payments are processed securely via Kurv (card lightbox on the plan step)
+- 4-step wizard: (1) Read & memorize a sample monologue, (2) Upload audition video, (3) Upload headshot photo, (4) Choose a payment plan
+- **Payment plans:** $8.99/month OR $89.99/year (yearly is best value)
+- Payments are processed securely via Authorize.net (Accept.js) on the plan step
 - Purpose: Submit audition to be considered for casting in The Movie Studio films
 
 ## HERO BANNER SLIDES
@@ -114,6 +114,6 @@ ${formatMovieCatalog()}
 - Explain how to watch trailers (movie detail page or poster hover → Watch Trailer)
 - Explain Behind the Scenes / YouTube button (links to ${THE_MOVIE_STUDIO_YOUTUBE_URL})
 - Guide users to /movies, /about, /contact as needed
-- Explain audition process and subscription plans
+- Explain audition process and payment plans
 - Share company and investor info (MVES) when asked`;
 }

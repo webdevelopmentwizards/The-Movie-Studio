@@ -140,6 +140,110 @@ export async function sendContactEmails(
   return { messageId: String(staffResult.messageId || "") };
 }
 
+export type AuditionMailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+};
+
+export type AuditionPaymentMailPayload = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  planName: string;
+  amountLabel: string;
+  period: string;
+  transactionId: string;
+  attachments: AuditionMailAttachment[];
+  /** Paths/notes when a file was too large to attach */
+  attachmentNotes?: string[];
+};
+
+export { AUDITION_MAX_UPLOAD_BYTES as AUDITION_EMAIL_ATTACH_MAX_BYTES } from "@/lib/auditionLimits";
+
+
+export async function sendAuditionPaymentEmails(
+  payload: AuditionPaymentMailPayload,
+): Promise<void> {
+  if (!isMailConfigured()) {
+    throw new Error("Email is not configured.");
+  }
+
+  const fromUser = requireEnv("SMTP_USER");
+  const studioTo = requireEnv("CONTACT_TO_EMAIL");
+  const fromName =
+    process.env.SMTP_FROM_NAME?.trim() || "The Movie Studio";
+  const fullName = `${payload.firstName} ${payload.lastName}`.trim();
+  const mailer = getTransporter();
+
+  const notesBlock =
+    payload.attachmentNotes && payload.attachmentNotes.length > 0
+      ? `<p><strong>Attachment notes:</strong></p><ul>${payload.attachmentNotes
+          .map((n) => `<li>${escapeHtml(n)}</li>`)
+          .join("")}</ul>`
+      : "";
+
+  const studioHtml = `
+    <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#18181b;">
+      <h2 style="margin:0 0 16px;font-size:18px;">New paid audition submission</h2>
+      <p style="margin:0 0 8px;"><strong>Name:</strong> ${escapeHtml(fullName)}</p>
+      <p style="margin:0 0 8px;"><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
+      <p style="margin:0 0 8px;"><strong>Plan:</strong> ${escapeHtml(payload.planName)} (${escapeHtml(payload.amountLabel)} ${escapeHtml(payload.period)})</p>
+      <p style="margin:0 0 16px;"><strong>Transaction ID:</strong> ${escapeHtml(payload.transactionId)}</p>
+      ${notesBlock}
+      <p style="margin:16px 0 0;font-size:12px;color:#71717a;">Audition video/photo attached when size allows.</p>
+    </div>
+  `;
+
+  await mailer.sendMail({
+    from: `"${fromName}" <${fromUser}>`,
+    to: studioTo,
+    replyTo: `"${fullName}" <${payload.email}>`,
+    subject: `[Audition] ${payload.planName} — ${fullName}`,
+    text: [
+      "New paid audition submission",
+      "",
+      `Name: ${fullName}`,
+      `Email: ${payload.email}`,
+      `Plan: ${payload.planName} (${payload.amountLabel} ${payload.period})`,
+      `Transaction ID: ${payload.transactionId}`,
+      ...(payload.attachmentNotes || []),
+    ].join("\n"),
+    html: studioHtml,
+    attachments: payload.attachments.map((file) => ({
+      filename: file.filename,
+      content: file.content,
+      contentType: file.contentType,
+    })),
+  });
+
+  await mailer.sendMail({
+    from: `"${fromName}" <${fromUser}>`,
+    to: payload.email,
+    subject: `Payment confirmed — Audition ${payload.planName} plan`,
+    text: [
+      `Hi ${payload.firstName},`,
+      "",
+      "Thank you for your payment. Your audition submission was received and our casting team will review it.",
+      "",
+      `Plan: ${payload.planName} (${payload.amountLabel} ${payload.period})`,
+      `Transaction ID: ${payload.transactionId}`,
+      "",
+      "— The Movie Studio",
+      "info@themoviestudio.com",
+    ].join("\n"),
+    html: `
+      <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#18181b;">
+        <p>Hi ${escapeHtml(payload.firstName)},</p>
+        <p>Thank you for your payment. Your audition submission was received and our casting team will review it.</p>
+        <p><strong>Plan:</strong> ${escapeHtml(payload.planName)} (${escapeHtml(payload.amountLabel)} ${escapeHtml(payload.period)})</p>
+        <p><strong>Transaction ID:</strong> ${escapeHtml(payload.transactionId)}</p>
+        <p style="margin-top:24px;color:#71717a;font-size:13px;">— The Movie Studio<br/>info@themoviestudio.com</p>
+      </div>
+    `,
+  });
+}
+
 export async function verifyMailTransport(): Promise<boolean> {
   if (!isMailConfigured()) return false;
   await getTransporter().verify();
