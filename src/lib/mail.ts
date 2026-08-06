@@ -154,6 +154,7 @@ export type AuditionPaymentMailPayload = {
   amountLabel: string;
   period: string;
   transactionId: string;
+  subscriptionId?: string;
   videoUrl: string;
   photoUrl: string;
   attachments?: AuditionMailAttachment[];
@@ -180,9 +181,10 @@ export async function sendAuditionPaymentEmails(
       <p style="margin:0 0 8px;"><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
       <p style="margin:0 0 8px;"><strong>Plan:</strong> ${escapeHtml(payload.planName)} (${escapeHtml(payload.amountLabel)} ${escapeHtml(payload.period)})</p>
       <p style="margin:0 0 8px;"><strong>Transaction ID:</strong> ${escapeHtml(payload.transactionId)}</p>
+      <p style="margin:0 0 8px;"><strong>Subscription ID:</strong> ${escapeHtml(payload.subscriptionId || "—")}</p>
       <p style="margin:0 0 8px;"><strong>Video:</strong> <a href="${escapeHtml(payload.videoUrl)}">${escapeHtml(payload.videoUrl)}</a></p>
       <p style="margin:0 0 16px;"><strong>Photo:</strong> <a href="${escapeHtml(payload.photoUrl)}">${escapeHtml(payload.photoUrl)}</a></p>
-      <p style="margin:16px 0 0;font-size:12px;color:#71717a;">Files are stored on MinIO / CDN.</p>
+      <p style="margin:16px 0 0;font-size:12px;color:#71717a;">Recurring plan. Files are stored on MinIO / CDN.</p>
     </div>
   `;
 
@@ -198,6 +200,7 @@ export async function sendAuditionPaymentEmails(
       `Email: ${payload.email}`,
       `Plan: ${payload.planName} (${payload.amountLabel} ${payload.period})`,
       `Transaction ID: ${payload.transactionId}`,
+      `Subscription ID: ${payload.subscriptionId || "—"}`,
       `Video: ${payload.videoUrl}`,
       `Photo: ${payload.photoUrl}`,
     ].join("\n"),
@@ -216,7 +219,7 @@ export async function sendAuditionPaymentEmails(
     text: [
       `Hi ${payload.firstName},`,
       "",
-      "Thank you for your payment. Your audition submission was received and our casting team will review it.",
+      "Thank you for your payment. Your audition plan is active and renews automatically until canceled. Our casting team will review your submission.",
       "",
       `Plan: ${payload.planName} (${payload.amountLabel} ${payload.period})`,
       `Transaction ID: ${payload.transactionId}`,
@@ -227,7 +230,7 @@ export async function sendAuditionPaymentEmails(
     html: `
       <div style="font-family:Segoe UI,Arial,sans-serif;line-height:1.5;color:#18181b;">
         <p>Hi ${escapeHtml(payload.firstName)},</p>
-        <p>Thank you for your payment. Your audition submission was received and our casting team will review it.</p>
+        <p>Thank you for your payment. Your audition plan is <strong>active</strong> and renews automatically until canceled. Our casting team will review your submission.</p>
         <p><strong>Plan:</strong> ${escapeHtml(payload.planName)} (${escapeHtml(payload.amountLabel)} ${escapeHtml(payload.period)})</p>
         <p><strong>Transaction ID:</strong> ${escapeHtml(payload.transactionId)}</p>
         <p style="margin-top:24px;color:#71717a;font-size:13px;">— The Movie Studio<br/>info@themoviestudio.com</p>

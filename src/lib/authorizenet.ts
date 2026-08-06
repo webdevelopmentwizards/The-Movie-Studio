@@ -7,6 +7,7 @@ export type OpaquePaymentData = {
 
 export type ChargeAuditionResult = {
   transactionId: string;
+  subscriptionId: string;
   authCode: string;
 };
 
@@ -74,6 +75,27 @@ function assertOk(messages: AuthNetMessages | undefined, fallback: string) {
   throw new Error(firstError(messages) || fallback);
 }
 
+function formatDateYmd(date: Date): string {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Next billing after the initial capture (avoids double-charging day one). */
+export function nextBillingStartDate(
+  planId: AuditionPlanId,
+  from: Date = new Date(),
+): string {
+  const next = new Date(from);
+  if (planId === "monthly") {
+    next.setUTCMonth(next.getUTCMonth() + 1);
+  } else {
+    next.setUTCFullYear(next.getUTCFullYear() + 1);
+  }
+  return formatDateYmd(next);
+}
+
 type ChargeParams = {
   planId: AuditionPlanId;
   opaqueData: OpaquePaymentData;
@@ -83,19 +105,19 @@ type ChargeParams = {
   zip?: string;
 };
 
-/** One-time audition plan charge (no recurring / ARB). */
-export async function chargeAuditionPayment(
-  params: ChargeParams,
-): Promise<ChargeAuditionResult> {
+async function createImmediateCharge(params: ChargeParams): Promise<{
+  transactionId: string;
+  authCode: string;
+}> {
   const plan = AUDITION_PLANS[params.planId];
   const invoiceNumber = `AUD${Date.now()}`.slice(0, 20);
 
   const data = await authNetRequest<{
     messages?: AuthNetMessages;
     transactionResponse?: {
-      responseCode?: string;
+      responseCode?: string | number;
       authCode?: string;
-      transId?: string;
+      transId?: string | number;
       errors?: { errorCode?: string; errorText?: string }[];
       messages?: { code?: string; description?: string }[];
     };
@@ -114,7 +136,7 @@ export async function chargeAuditionPayment(
         },
         order: {
           invoiceNumber,
-          description: `Audition ${plan.name} payment`,
+          description: `Audition ${plan.name} (initial)`,
         },
         customer: {
           email: params.email,
@@ -134,7 +156,6 @@ export async function chargeAuditionPayment(
   const responseCode = String(tx?.responseCode ?? "").trim();
   const transId = String(tx?.transId ?? "").trim();
 
-  // responseCode "1" = Approved (JSON may return number or string)
   if (!tx || responseCode !== "1" || !transId || transId === "0") {
     const decline =
       tx?.errors?.[0]?.errorText ||
@@ -142,7 +163,7 @@ export async function chargeAuditionPayment(
         ? tx?.messages?.[0]?.description
         : undefined) ||
       (transId === "0"
-        ? "Authorize.net is in Test Mode (transaction ID 0). Turn OFF Test Mode in the merchant settings."
+        ? "Authorize.net is in Test Mode (transaction ID 0). Turn OFF Test Mode to create recurring subscriptions."
         : "Card was declined.");
     throw new Error(decline);
   }
@@ -153,5 +174,115 @@ export async function chargeAuditionPayment(
   };
 }
 
-/** @deprecated Use chargeAuditionPayment — kept for older imports. */
+async function createCustomerProfileFromTransaction(
+  transactionId: string,
+  email: string,
+): Promise<{ customerProfileId: string; paymentProfileId: string }> {
+  const data = await authNetRequest<{
+    messages?: AuthNetMessages;
+    customerProfileId?: string | number;
+    customerPaymentProfileIdList?: Array<string | number>;
+  }>({
+    createCustomerProfileFromTransactionRequest: {
+      merchantAuthentication: merchantAuthentication(),
+      transId: transactionId,
+      customer: {
+        email,
+      },
+    },
+  });
+
+  assertOk(data.messages, "Unable to save card for recurring billing.");
+
+  const customerProfileId = String(data.customerProfileId ?? "").trim();
+  const paymentProfileId = String(
+    data.customerPaymentProfileIdList?.[0] ?? "",
+  ).trim();
+
+  if (!customerProfileId || !paymentProfileId) {
+    throw new Error("Customer profile was not created for recurring billing.");
+  }
+
+  return { customerProfileId, paymentProfileId };
+}
+
+async function createArbSubscription(params: {
+  planId: AuditionPlanId;
+  customerProfileId: string;
+  paymentProfileId: string;
+}): Promise<string> {
+  const plan = AUDITION_PLANS[params.planId];
+
+  // Profile-based ARB: do not send order / billTo / customer (schema rejects them).
+  const data = await authNetRequest<{
+    messages?: AuthNetMessages;
+    subscriptionId?: string | number;
+  }>({
+    ARBCreateSubscriptionRequest: {
+      merchantAuthentication: merchantAuthentication(),
+      subscription: {
+        name: `Audition ${plan.name}`.slice(0, 50),
+        paymentSchedule: {
+          interval: {
+            length: plan.intervalLength,
+            unit: "months",
+          },
+          startDate: nextBillingStartDate(params.planId),
+          totalOccurrences: 9999,
+        },
+        amount: plan.amount,
+        profile: {
+          customerProfileId: params.customerProfileId,
+          customerPaymentProfileId: params.paymentProfileId,
+        },
+      },
+    },
+  });
+
+  assertOk(data.messages, "Unable to create recurring subscription.");
+
+  const subscriptionId = String(data.subscriptionId ?? "").trim();
+  if (!subscriptionId) {
+    throw new Error("Subscription ID missing from Authorize.net response.");
+  }
+
+  return subscriptionId;
+}
+
+/**
+ * Immediate charge + ARB recurring subscription (next cycle onwards).
+ */
+export async function chargeAuditionPayment(
+  params: ChargeParams,
+): Promise<ChargeAuditionResult> {
+  const charge = await createImmediateCharge(params);
+
+  let subscriptionId = "";
+  try {
+    const profile = await createCustomerProfileFromTransaction(
+      charge.transactionId,
+      params.email,
+    );
+    subscriptionId = await createArbSubscription({
+      planId: params.planId,
+      customerProfileId: profile.customerProfileId,
+      paymentProfileId: profile.paymentProfileId,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error(
+      "[authorizenet] charge ok but recurring setup failed:",
+      message,
+      "transactionId=",
+      charge.transactionId,
+    );
+  }
+
+  return {
+    transactionId: charge.transactionId,
+    subscriptionId,
+    authCode: charge.authCode,
+  };
+}
+
 export const chargeAuditionSubscription = chargeAuditionPayment;

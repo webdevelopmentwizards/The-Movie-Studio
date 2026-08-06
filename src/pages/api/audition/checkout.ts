@@ -19,13 +19,14 @@ import { isMinioConfigured, uploadAuditionFile } from "@/lib/minio";
 export const config = {
   api: {
     bodyParser: false,
-    sizeLimit: `${AUDITION_MAX_VIDEO_MB + AUDITION_MAX_PHOTO_MB}mb`,
+    responseLimit: false,
   },
 };
 
 type CheckoutSuccess = {
   ok: true;
   transactionId: string;
+  subscriptionId: string;
   planId: AuditionPlanId;
   amount: string;
   videoUrl?: string;
@@ -203,6 +204,7 @@ export default async function handler(
           amountLabel: plan.priceLabel,
           period: plan.period,
           transactionId: result.transactionId,
+          subscriptionId: result.subscriptionId,
           videoUrl: videoUpload.url,
           photoUrl: photoUpload.url,
         });
@@ -226,6 +228,7 @@ export default async function handler(
     return res.status(200).json({
       ok: true,
       transactionId: result.transactionId,
+      subscriptionId: result.subscriptionId,
       planId,
       amount: plan.amount,
       videoUrl: videoUpload.url,

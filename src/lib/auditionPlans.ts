@@ -7,8 +7,10 @@ export const AUDITION_PLANS = {
     amount: "9.99",
     priceLabel: "$9.99",
     period: "per month",
+    /** ARB interval length in months */
+    intervalLength: 1,
     description:
-      "Perfect for trying out auditions and submitting your first scenes.",
+      "Perfect for trying out auditions and submitting your first scenes. Renews automatically each month.",
   },
   yearly: {
     id: "yearly" as const,
@@ -16,7 +18,9 @@ export const AUDITION_PLANS = {
     amount: "89.99",
     priceLabel: "$89.99",
     period: "per year",
-    description: "Best value — stay in the spotlight all year long.",
+    intervalLength: 12,
+    description:
+      "Best value — stay in the spotlight all year. Renews automatically each year.",
     badge: "Best Value",
   },
 } as const;
