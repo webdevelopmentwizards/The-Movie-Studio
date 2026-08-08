@@ -71,13 +71,13 @@ export default function About() {
                 www.themoviestudio.com
               </a>
             </div>
-            <div className="mx-auto w-full max-w-[340px] overflow-hidden rounded-2xl border border-zinc-800 bg-black">
+            <div className="mx-auto w-full max-w-[400px] overflow-hidden rounded-2xl border border-zinc-800 bg-black">
               <Image
-                src={`${CDN_ASSETS_BASE}/movies.png`}
-                alt="The Movie Studio film catalog"
-                width={411}
-                height={613}
-                sizes="340px"
+                src="/tms-mashup-cover.jpg"
+                alt="The Movie Studio film catalog mashup"
+                width={400}
+                height={597}
+                sizes="400px"
                 className="h-auto w-full"
               />
             </div>
