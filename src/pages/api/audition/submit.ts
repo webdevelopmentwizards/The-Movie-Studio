@@ -8,11 +8,6 @@ import {
   AUDITION_MAX_VIDEO_BYTES,
   AUDITION_MAX_VIDEO_MB,
 } from "@/lib/auditionLimits";
-import { AUDITION_PLANS, type AuditionPlanId } from "@/lib/auditionPlans";
-import {
-  chargeAuditionPayment,
-  isAuthorizeNetConfigured,
-} from "@/lib/authorizenet";
 import { isMailConfigured, sendAuditionSubmissionEmails } from "@/lib/mail";
 import { isMinioConfigured, uploadAuditionFile } from "@/lib/minio";
 
@@ -23,24 +18,16 @@ export const config = {
   },
 };
 
-type CheckoutSuccess = {
+type SubmitSuccess = {
   ok: true;
-  transactionId: string;
-  subscriptionId: string;
-  planId: AuditionPlanId;
-  amount: string;
   videoUrl?: string;
   photoUrl?: string;
 };
 
-type CheckoutError = {
+type SubmitError = {
   ok: false;
   error: string;
 };
-
-function isPlanId(value: unknown): value is AuditionPlanId {
-  return value === "monthly" || value === "yearly";
-}
 
 function firstFile(
   files: Record<string, FormidableFile | FormidableFile[] | undefined>,
@@ -82,18 +69,10 @@ function parseForm(req: NextApiRequest): Promise<{
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse<CheckoutSuccess | CheckoutError>,
+  res: NextApiResponse<SubmitSuccess | SubmitError>,
 ) {
   if (req.method !== "POST") {
     return res.status(405).json({ ok: false, error: "Method not allowed." });
-  }
-
-  if (!isAuthorizeNetConfigured()) {
-    return res.status(503).json({
-      ok: false,
-      error:
-        "Payment is not configured. Add AUTHORIZENET_API_LOGIN_ID and AUTHORIZENET_TRANSACTION_KEY.",
-    });
   }
 
   if (!isMinioConfigured()) {
@@ -111,29 +90,17 @@ export default async function handler(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unable to read upload.";
-    console.error("[audition/checkout] form parse", message);
+    console.error("[audition/submit] form parse", message);
     return res.status(400).json({
       ok: false,
       error: "Unable to read submission. File may be too large.",
     });
   }
 
-  const dataDescriptor = fields.dataDescriptor?.trim();
-  const dataValue = fields.dataValue?.trim();
   const firstName = fields.firstName?.trim();
   const lastName = fields.lastName?.trim();
   const email = fields.email?.trim();
-  const zip = fields.zip?.trim();
-  const planId = fields.planId?.trim();
 
-  if (!dataDescriptor || !dataValue) {
-    return res
-      .status(400)
-      .json({ ok: false, error: "Payment nonce is required." });
-  }
-  if (!isPlanId(planId)) {
-    return res.status(400).json({ ok: false, error: "Invalid plan selected." });
-  }
   if (!firstName || !lastName) {
     return res
       .status(400)
@@ -168,17 +135,6 @@ export default async function handler(
   }
 
   try {
-    const result = await chargeAuditionPayment({
-      planId,
-      opaqueData: { dataDescriptor, dataValue },
-      firstName,
-      lastName,
-      email,
-      zip,
-    });
-
-    const plan = AUDITION_PLANS[planId];
-
     const [videoUpload, photoUpload] = await Promise.all([
       uploadAuditionFile({
         localPath: video.filepath,
@@ -206,11 +162,15 @@ export default async function handler(
       } catch (mailError) {
         const message =
           mailError instanceof Error ? mailError.message : "Mail failed";
-        console.error("[audition/checkout] email failed:", message);
+        console.error("[audition/submit] email failed:", message);
+        return res.status(502).json({
+          ok: false,
+          error: "Submission saved but email failed. Please try again later.",
+        });
       }
     } else {
       console.warn(
-        "[audition/checkout] mail not configured; skipped audition emails.",
+        "[audition/submit] mail not configured; skipped audition emails.",
       );
     }
 
@@ -222,20 +182,20 @@ export default async function handler(
 
     return res.status(200).json({
       ok: true,
-      transactionId: result.transactionId,
-      subscriptionId: result.subscriptionId,
-      planId,
-      amount: plan.amount,
       videoUrl: videoUpload.url,
       photoUrl: photoUpload.url,
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Payment processing failed.";
-    console.error("[audition/checkout]", message);
-    return res.status(402).json({
+      error instanceof Error ? error.message : "Submission failed.";
+    console.error("[audition/submit]", message);
+    const unreachable =
+      /ETIMEDOUT|ECONNREFUSED|ENOTFOUND|timeout|timed out/i.test(message);
+    return res.status(unreachable ? 503 : 500).json({
       ok: false,
-      error: message || "Unable to process payment. Please try again.",
+      error: unreachable
+        ? "File storage server is unreachable. MinIO port 9000 may be blocked — open it on the server firewall or fix MINIO_ENDPOINT."
+        : message || "Unable to submit audition. Please try again.",
     });
   }
 }
