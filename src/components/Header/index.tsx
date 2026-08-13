@@ -18,7 +18,7 @@ const navLinks = [
 
 export default function Navbar() {
   const router = useRouter();
-  const { session, isLoggedIn, logout } = useMemberSession();
+  const { session, isLoggedIn, requiresPlan, logout } = useMemberSession();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -98,7 +98,7 @@ export default function Navbar() {
                     </p>
                   </div>
                   <Link
-                    href="/dashboard"
+                    href={requiresPlan ? "/plans" : "/dashboard"}
                     role="menuitem"
                     onClick={() => setAccountOpen(false)}
                     className="block px-4 py-2.5 text-sm text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-amber-400"
@@ -177,7 +177,7 @@ export default function Navbar() {
                   <p className="text-xs text-zinc-500">{session.email}</p>
                 </div>
                 <Link
-                  href="/dashboard"
+                  href={requiresPlan ? "/plans" : "/dashboard"}
                   onClick={() => setOpen(false)}
                   className="rounded-lg px-2 py-2 text-sm font-medium text-amber-400"
                 >

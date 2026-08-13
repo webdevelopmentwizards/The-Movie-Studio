@@ -1,6 +1,11 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from "next";
 
-import { ACCESS_TOKEN_COOKIE, LOGIN_PATH } from "@/lib/auth/constants";
+import {
+  ACCESS_TOKEN_COOKIE,
+  LOGIN_PATH,
+  PLANS_PATH,
+} from "@/lib/auth/constants";
+import { resolvePlanGate } from "@/lib/auth/routeAfterAuth";
 import type { MemberSession } from "@/lib/memberSession";
 import type { MembershipPlanId } from "@/lib/membershipPlans";
 import type { AuthUser } from "@/services/auth.service";
@@ -21,6 +26,7 @@ export type SsrAuthProps = {
   user: AuthUser;
   membership: MembershipRecord | null;
   isMember: boolean;
+  requiresPlan: boolean;
   session: MemberSession | null;
 };
 
@@ -97,23 +103,41 @@ export async function resolveSsrAuth(
   const accessToken = getTokenFromContext(ctx);
   if (!accessToken) return null;
 
-  const me = await apiGet<{ user: AuthUser }>("/auth/me", accessToken);
-  if (!me?.user) return null;
+  const meRaw = await apiGet<{
+    user?: AuthUser;
+    requiresPlan?: boolean;
+    isMember?: boolean;
+    email?: string;
+    id?: string;
+  }>("/auth/me", accessToken);
+  if (!meRaw) return null;
+
+  const user: AuthUser | undefined =
+    meRaw.user ||
+    (meRaw.email && meRaw.id
+      ? (meRaw as unknown as AuthUser)
+      : undefined);
+  if (!user) return null;
 
   const membershipData = await apiGet<{
     membership: MembershipRecord | null;
     isMember: boolean;
+    requiresPlan?: boolean;
   }>("/membership/me", accessToken);
 
   const membership = membershipData?.membership ?? null;
-  const isMember = Boolean(membershipData?.isMember);
+  const gate = resolvePlanGate({
+    requiresPlan: meRaw.requiresPlan ?? membershipData?.requiresPlan,
+    isMember: meRaw.isMember ?? membershipData?.isMember,
+  });
 
   return {
     accessToken,
-    user: me.user,
+    user,
     membership,
-    isMember,
-    session: toSession(me.user, membership),
+    isMember: gate.isMember,
+    requiresPlan: gate.requiresPlan,
+    session: toSession(user, membership),
   };
 }
 
@@ -130,10 +154,10 @@ export function withAuthSSR(
       return loginRedirect(ctx);
     }
 
-    if (options.requireMember && !auth.isMember) {
+    if (options.requireMember && (auth.requiresPlan || !auth.isMember)) {
       return {
         redirect: {
-          destination: "/membership",
+          destination: PLANS_PATH,
           permanent: false as const,
         },
       };
@@ -145,6 +169,7 @@ export function withAuthSSR(
         user: auth.user,
         membership: auth.membership,
         isMember: auth.isMember,
+        requiresPlan: auth.requiresPlan,
         session: auth.session,
       },
     };

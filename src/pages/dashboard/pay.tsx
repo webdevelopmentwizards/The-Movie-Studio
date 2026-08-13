@@ -21,9 +21,11 @@ import {
   type MembershipPlanId,
 } from "@/lib/membershipPlans";
 import { requireAuth, type SsrAuthProps } from "@/lib/auth/ssrAuth";
+import { loadAcceptJs } from "@/lib/acceptjs";
 import { useApi } from "@/context/ApiContext";
+import { membershipService } from "@/services/membership.service";
 import { useAppDispatch, useAppSelector } from "@/store";
-import { activateMembership, selectAuth } from "@/store/apps/auth";
+import { payMembership, selectAuth } from "@/store/apps/auth";
 
 export const getServerSideProps = requireAuth;
 
@@ -85,6 +87,22 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
   const plan = MEMBERSHIP_PLANS[planId];
 
   useEffect(() => {
+    let cancelled = false;
+    void membershipService
+      .config()
+      .then((cfg) => {
+        if (cancelled) return;
+        return loadAcceptJs(cfg.acceptJsUrl);
+      })
+      .catch(() => {
+        // Script loads again on submit if this preload fails.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!auth.user) return;
     const pending = getMemberPending();
     const fallbackName =
@@ -130,6 +148,15 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
       return;
     }
 
+    const match = /^(\d{2})\/(\d{2})$/.exec(expiry);
+    if (!match) {
+      toast.warning("Enter a valid expiry date (MM/YY).");
+      return;
+    }
+    const month = match[1];
+    const year = `20${match[2]}`;
+    const cvcDigits = onlyDigits(cvc);
+
     setSubmitting(true);
 
     const pending = getMemberPending();
@@ -144,19 +171,28 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
       });
     }
 
-    const result = await dispatch(activateMembership(planId));
+    const result = await dispatch(
+      payMembership({
+        planId,
+        card: {
+          cardNumber,
+          month,
+          year,
+          cardCode: cvcDigits,
+        },
+      }),
+    );
     setSubmitting(false);
 
-    if (activateMembership.fulfilled.match(result)) {
+    if (payMembership.fulfilled.match(result)) {
       clearMemberPending();
-      toast.success("Membership activated");
-      void router.push("/dashboard");
+      toast.success("Payment successful");
+      void router.replace("/dashboard");
       return;
     }
 
     toast.error(
-      (result.payload as string) ||
-        "Unable to activate membership. Please try again.",
+      (result.payload as string) || "Payment failed",
     );
   }
 
@@ -249,7 +285,7 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
                   }
                   maxLength={19}
                   className={inputClassName}
-                  placeholder="4242 4242 4242 4242"
+                  placeholder="4111 1111 1111 1111"
                 />
               </div>
 
@@ -305,11 +341,16 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
               </div>
 
               <p className="text-[11px] leading-relaxed text-zinc-500">
-                Demo tip: use{" "}
+                Sandbox test cards: Visa{" "}
                 <span className="font-medium text-zinc-300">
-                  4242 4242 4242 4242
+                  4111 1111 1111 1111
                 </span>
-                , any future expiry, and any 3-digit CVC.
+                {" "}or Mastercard{" "}
+                <span className="font-medium text-zinc-300">
+                  5424 0000 0000 0015
+                </span>
+                , any future expiry, CVV{" "}
+                <span className="font-medium text-zinc-300">900</span>.
               </p>
 
               <button

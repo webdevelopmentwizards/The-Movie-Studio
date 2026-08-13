@@ -7,7 +7,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import Logo from "@/components/Logo";
 import { useApi } from "@/context/ApiContext";
-import { safeNextPath } from "@/lib/auth/constants";
+import { DASHBOARD_PATH, safeNextPath } from "@/lib/auth/constants";
+import { destinationAfterAuth } from "@/lib/auth/routeAfterAuth";
 import { useAppDispatch, useAppSelector } from "@/store";
 import { clearAuthError, login, selectAuth } from "@/store/apps/auth";
 
@@ -20,7 +21,7 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   const nextPath = useMemo(
-    () => safeNextPath(router.query.next, "/dashboard"),
+    () => safeNextPath(router.query.next, DASHBOARD_PATH),
     [router.query.next],
   );
 
@@ -31,9 +32,14 @@ export default function Login() {
   // Already logged in → leave login (middleware also enforces this)
   useEffect(() => {
     if (auth.initialized && auth.user && !submitting) {
-      void router.replace(nextPath);
+      void router.replace(
+        destinationAfterAuth(
+          { requiresPlan: auth.requiresPlan },
+          nextPath,
+        ),
+      );
     }
-  }, [auth.initialized, auth.user, nextPath, router, submitting]);
+  }, [auth.initialized, auth.user, auth.requiresPlan, nextPath, router, submitting]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -54,7 +60,12 @@ export default function Login() {
 
     if (login.fulfilled.match(result)) {
       toast.success("Signed in successfully");
-      void router.push(nextPath);
+      void router.replace(
+        destinationAfterAuth(
+          { requiresPlan: result.payload.requiresPlan },
+          nextPath,
+        ),
+      );
       return;
     }
 

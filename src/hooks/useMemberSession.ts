@@ -31,6 +31,7 @@ export function useMemberSession() {
 
   const isLoggedIn = Boolean(auth.user);
   const isMember = Boolean(auth.user && auth.isMember);
+  const requiresPlan = Boolean(auth.user && auth.requiresPlan);
   const ready = auth.initialized;
 
   function logout() {
@@ -43,6 +44,7 @@ export function useMemberSession() {
     logout,
     isLoggedIn,
     isMember,
+    requiresPlan,
     user: auth.user,
     authStatus: auth.status,
     error: auth.error,

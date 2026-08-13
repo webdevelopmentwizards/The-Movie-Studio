@@ -3,11 +3,11 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 
 import MemberDashboard from "@/components/MemberDashboard";
-import { requireAuth, type SsrAuthProps } from "@/lib/auth/ssrAuth";
+import { requireMember, type SsrAuthProps } from "@/lib/auth/ssrAuth";
 import { useAppDispatch } from "@/store";
 import { logout as logoutThunk } from "@/store/apps/auth";
 
-export const getServerSideProps = requireAuth;
+export const getServerSideProps = requireMember;
 
 export default function DashboardPage({ session }: SsrAuthProps) {
   const router = useRouter();

@@ -1,15 +1,37 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
 import {
+  MEMBERSHIP_REQUIRED_EVENT,
+  MEMBERSHIP_REQUIRED_MESSAGE,
+  MEMBERSHIP_REQUIRED_STATUS,
+} from "@/lib/auth/constants";
+import {
   clearStoredTokens,
   getStoredAccessToken,
   getStoredRefreshToken,
   setStoredTokens,
 } from "@/lib/auth/tokenStorage";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "http://localhost:5000/api/v1";
+function resolveApiBaseUrl() {
+  const api =
+    process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+    "http://localhost:5000/api/v1";
+
+  if (typeof window === "undefined") return api;
+
+  try {
+    const parsed = new URL(api, window.location.origin);
+    if (window.location.protocol === "https:" && parsed.protocol === "http:") {
+      return "/__api";
+    }
+  } catch {
+    return api;
+  }
+
+  return api;
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export {
   clearStoredTokens,
@@ -67,16 +89,29 @@ axiosInstance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiErrorBody>) => {
-    if (error.response?.status === 401 && typeof window !== "undefined") {
+    if (typeof window !== "undefined") {
+      const status = error.response?.status;
+      const body = error.response?.data;
       const url = error.config?.url || "";
-      const isAuthEndpoint =
-        url.includes("/auth/login") ||
-        url.includes("/auth/signup") ||
-        url.includes("/auth/register");
 
-      if (!isAuthEndpoint) {
-        clearStoredTokens();
-        window.dispatchEvent(new Event("tms-auth-unauthorized"));
+      if (status === 401) {
+        const isAuthEndpoint =
+          url.includes("/auth/login") ||
+          url.includes("/auth/signup") ||
+          url.includes("/auth/register");
+
+        if (!isAuthEndpoint) {
+          clearStoredTokens();
+          window.dispatchEvent(new Event("tms-auth-unauthorized"));
+        }
+      }
+
+      if (
+        status === 403 &&
+        (body?.message === MEMBERSHIP_REQUIRED_MESSAGE ||
+          body?.statusCode === MEMBERSHIP_REQUIRED_STATUS)
+      ) {
+        window.dispatchEvent(new Event(MEMBERSHIP_REQUIRED_EVENT));
       }
     }
     return Promise.reject(error);

@@ -6,10 +6,19 @@ export {
   LOGIN_PATH,
   SIGNUP_PATH,
   HOME_PATH,
+  PLANS_PATH,
+  DASHBOARD_PATH,
+  MEMBERSHIP_REQUIRED_MESSAGE,
+  MEMBERSHIP_REQUIRED_EVENT,
   isProtectedPath,
   isGuestPath,
+  isPlanPath,
   safeNextPath,
 } from "@/lib/auth/constants";
+export {
+  destinationAfterAuth,
+  resolvePlanGate,
+} from "@/lib/auth/routeAfterAuth";
 export {
   getStoredAccessToken,
   getStoredRefreshToken,

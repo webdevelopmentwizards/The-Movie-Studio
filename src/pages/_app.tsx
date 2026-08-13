@@ -10,7 +10,7 @@ import PageLayout from "@/layout";
 import ChatAssistant from "@/components/ChatAssistant";
 import AppToaster from "@/components/AppToaster";
 import { ApiProvider } from "@/context/ApiContext";
-import { isGuestPath } from "@/lib/auth/constants";
+import { isGuestPath, isPlanPath, MEMBERSHIP_REQUIRED_EVENT, PLANS_PATH } from "@/lib/auth/constants";
 import ReduxProvider from "@/store/ReduxProvider";
 
 const poppins = Poppins({
@@ -24,10 +24,26 @@ const BARE_ROUTES = ["/dashboard/pay"];
 const NO_FOOTER_ROUTES = ["/dashboard"];
 
 export default function App({ Component, pageProps }: AppProps) {
-  const { pathname } = useRouter();
+  const router = useRouter();
+  const { pathname } = router;
   const showChrome =
     !isGuestPath(pathname) && !BARE_ROUTES.includes(pathname);
   const showFooter = showChrome && !NO_FOOTER_ROUTES.includes(pathname);
+
+  useEffect(() => {
+    function onMembershipRequired() {
+      if (isPlanPath(pathname)) return;
+      void router.replace(PLANS_PATH);
+    }
+
+    window.addEventListener(MEMBERSHIP_REQUIRED_EVENT, onMembershipRequired);
+    return () => {
+      window.removeEventListener(
+        MEMBERSHIP_REQUIRED_EVENT,
+        onMembershipRequired,
+      );
+    };
+  }, [pathname, router]);
 
   useEffect(() => {
     if (showChrome) return;

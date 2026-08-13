@@ -16,6 +16,7 @@ import {
 } from "./icons";
 
 import { CDN_ASSETS_BASE } from "@/constants/cdn";
+import { destinationAfterAuth } from "@/lib/auth/routeAfterAuth";
 import { useApi } from "@/context/ApiContext";
 import { useAppDispatch } from "@/store";
 import { login, register } from "@/store/apps/auth";
@@ -208,8 +209,8 @@ export default function LoginSignUpPage() {
       setSubmitting(false);
       if (login.fulfilled.match(result)) {
         toast.success("Signed in successfully");
-        void router.push(
-          result.payload.isMember ? "/dashboard" : "/membership",
+        void router.replace(
+          destinationAfterAuth({ requiresPlan: result.payload.requiresPlan }),
         );
         return;
       }
@@ -225,7 +226,9 @@ export default function LoginSignUpPage() {
     setSubmitting(false);
     if (register.fulfilled.match(result)) {
       toast.success("Account created successfully");
-      void router.push("/membership");
+      void router.replace(
+        destinationAfterAuth({ requiresPlan: result.payload.requiresPlan }),
+      );
       return;
     }
     toast.error((result.payload as string) || "Unable to create account.");

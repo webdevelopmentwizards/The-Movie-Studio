@@ -23,6 +23,14 @@ export type AuthTokens = {
 export type AuthPayload = {
   user: AuthUser;
   tokens: AuthTokens;
+  requiresPlan?: boolean;
+  isMember?: boolean;
+};
+
+export type AuthMeData = {
+  user: AuthUser;
+  requiresPlan?: boolean;
+  isMember?: boolean;
 };
 
 export type LoginInput = {
@@ -66,9 +74,21 @@ export const authService = {
   },
 
   async me() {
-    const { data } = await axiosInstance.get<ApiSuccess<{ user: AuthUser }>>(
-      "/auth/me",
-    );
-    return data.data.user;
+    const { data } = await axiosInstance.get<
+      ApiSuccess<AuthMeData | (AuthUser & { requiresPlan?: boolean; isMember?: boolean })>
+    >("/auth/me");
+    const payload = data.data;
+    if (payload && "user" in payload && payload.user) {
+      return payload;
+    }
+    const nested = payload as AuthUser & {
+      requiresPlan?: boolean;
+      isMember?: boolean;
+    };
+    return {
+      user: nested,
+      requiresPlan: nested.requiresPlan,
+      isMember: nested.isMember,
+    };
   },
 };

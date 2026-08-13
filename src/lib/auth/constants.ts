@@ -30,6 +30,22 @@ export const GUEST_PATHS = ["/login", "/signup"] as const;
 export const LOGIN_PATH = "/login";
 export const SIGNUP_PATH = "/signup";
 export const HOME_PATH = "/";
+export const PLANS_PATH = "/plans";
+export const DASHBOARD_PATH = "/dashboard";
+
+export const MEMBERSHIP_REQUIRED_STATUS = "10001";
+export const MEMBERSHIP_REQUIRED_MESSAGE =
+  "Membership required. Please choose a plan to continue.";
+export const MEMBERSHIP_REQUIRED_EVENT = "tms-membership-required";
+
+export function isPlanPath(pathname: string): boolean {
+  return (
+    pathname === PLANS_PATH ||
+    pathname === "/membership" ||
+    pathname === "/dashboard/pay" ||
+    pathname.startsWith("/dashboard/pay?")
+  );
+}
 
 function matchesPrefix(pathname: string, prefixes: readonly string[]) {
   return prefixes.some(

@@ -7,7 +7,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import Logo from "@/components/Logo";
 import { useApi } from "@/context/ApiContext";
-import { safeNextPath } from "@/lib/auth/constants";
+import { PLANS_PATH, safeNextPath } from "@/lib/auth/constants";
+import { destinationAfterAuth } from "@/lib/auth/routeAfterAuth";
 import { setMemberPending } from "@/lib/memberSession";
 import {
   isMembershipPlanId,
@@ -43,20 +44,25 @@ export default function Signup() {
   const [submitting, setSubmitting] = useState(false);
 
   const nextPath = useMemo(
-    () => safeNextPath(router.query.next, "/membership"),
+    () => safeNextPath(router.query.next, PLANS_PATH),
     [router.query.next],
   );
 
   const loginHref = useMemo(() => {
-    if (nextPath === "/membership") return "/login";
+    if (nextPath === PLANS_PATH || nextPath === "/membership") return "/login";
     return `/login?next=${encodeURIComponent(nextPath)}`;
   }, [nextPath]);
 
   useEffect(() => {
     if (auth.initialized && auth.user && !submitting) {
-      void router.replace(nextPath);
+      void router.replace(
+        destinationAfterAuth(
+          { requiresPlan: auth.requiresPlan },
+          nextPath,
+        ),
+      );
     }
-  }, [auth.initialized, auth.user, nextPath, router, submitting]);
+  }, [auth.initialized, auth.user, auth.requiresPlan, nextPath, router, submitting]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,7 +96,12 @@ export default function Signup() {
         setMemberPending({ name: fullName, email, planId });
       }
       toast.success("Account created successfully");
-      void router.push(nextPath);
+      void router.replace(
+        destinationAfterAuth(
+          { requiresPlan: result.payload.requiresPlan },
+          nextPath,
+        ),
+      );
       return;
     }
 

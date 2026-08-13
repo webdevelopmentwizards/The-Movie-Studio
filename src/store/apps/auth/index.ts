@@ -12,8 +12,12 @@ import {
 } from "@/services/auth.service";
 import {
   membershipService,
+  type MembershipPayData,
   type MembershipRecord,
 } from "@/services/membership.service";
+import { resolvePlanGate } from "@/lib/auth/routeAfterAuth";
+import type { TokenizeCardFields } from "@/lib/acceptjs";
+import type { MembershipPlanId } from "@/lib/membershipPlans";
 import {
   clearStoredTokens,
   getApiErrorMessage,
@@ -26,6 +30,7 @@ export type AuthState = {
   user: AuthUser | null;
   membership: MembershipRecord | null;
   isMember: boolean;
+  requiresPlan: boolean;
   accessToken: string | null;
   status: "idle" | "loading" | "authenticated" | "anonymous";
   error: string | null;
@@ -36,6 +41,7 @@ const initialState: AuthState = {
   user: null,
   membership: null,
   isMember: false,
+  requiresPlan: false,
   accessToken: null,
   status: "idle",
   error: null,
@@ -48,6 +54,27 @@ function displayName(user: AuthUser): string {
   return user.email.split("@")[0] || "Member";
 }
 
+async function loadMembershipGate(authFlags?: {
+  requiresPlan?: boolean;
+  isMember?: boolean;
+}) {
+  let membership: MembershipRecord | null = null;
+  let gate = resolvePlanGate(authFlags || {});
+
+  try {
+    const membershipData = await membershipService.me();
+    membership = membershipData.membership;
+    gate = resolvePlanGate({
+      requiresPlan: authFlags?.requiresPlan ?? membershipData.requiresPlan,
+      isMember: authFlags?.isMember ?? membershipData.isMember,
+    });
+  } catch {
+    // membership endpoint may fail; keep flags from auth payload
+  }
+
+  return { membership, ...gate };
+}
+
 export const bootstrapAuth = createAsyncThunk(
   "auth/bootstrap",
   async (_, { rejectWithValue }) => {
@@ -57,6 +84,7 @@ export const bootstrapAuth = createAsyncThunk(
         user: null,
         membership: null,
         isMember: false,
+        requiresPlan: false,
         accessToken: null,
       };
     }
@@ -67,17 +95,18 @@ export const bootstrapAuth = createAsyncThunk(
     });
 
     try {
-      const user = await authService.me();
-      let membership: MembershipRecord | null = null;
-      let isMember = false;
-      try {
-        const membershipData = await membershipService.me();
-        membership = membershipData.membership;
-        isMember = membershipData.isMember;
-      } catch {
-        // membership endpoint may fail for non-members; ignore
-      }
-      return { user, membership, isMember, accessToken: token };
+      const me = await authService.me();
+      const gate = await loadMembershipGate({
+        requiresPlan: me.requiresPlan,
+        isMember: me.isMember,
+      });
+      return {
+        user: me.user,
+        membership: gate.membership,
+        isMember: gate.isMember,
+        requiresPlan: gate.requiresPlan,
+        accessToken: token,
+      };
     } catch (error) {
       clearStoredTokens();
       return rejectWithValue(getApiErrorMessage(error, "Session expired."));
@@ -89,21 +118,17 @@ export const login = createAsyncThunk(
   "auth/login",
   async (input: LoginInput, { rejectWithValue }) => {
     try {
-      const { user, tokens } = await authService.login(input);
-      let membership: MembershipRecord | null = null;
-      let isMember = false;
-      try {
-        const membershipData = await membershipService.me();
-        membership = membershipData.membership;
-        isMember = membershipData.isMember;
-      } catch {
-        // ignore
-      }
+      const payload = await authService.login(input);
+      const gate = await loadMembershipGate({
+        requiresPlan: payload.requiresPlan,
+        isMember: payload.isMember,
+      });
       return {
-        user,
-        membership,
-        isMember,
-        accessToken: tokens.accessToken,
+        user: payload.user,
+        membership: gate.membership,
+        isMember: gate.isMember,
+        requiresPlan: gate.requiresPlan,
+        accessToken: payload.tokens.accessToken,
       };
     } catch (error) {
       return rejectWithValue(getApiErrorMessage(error, "Invalid credentials."));
@@ -115,12 +140,17 @@ export const register = createAsyncThunk(
   "auth/register",
   async (input: RegisterInput, { rejectWithValue }) => {
     try {
-      const { user, tokens } = await authService.register(input);
+      const payload = await authService.register(input);
+      const gate = resolvePlanGate({
+        requiresPlan: payload.requiresPlan,
+        isMember: payload.isMember,
+      });
       return {
-        user,
+        user: payload.user,
         membership: null as MembershipRecord | null,
-        isMember: false,
-        accessToken: tokens.accessToken,
+        isMember: gate.isMember,
+        requiresPlan: gate.requiresPlan,
+        accessToken: payload.tokens.accessToken,
       };
     } catch (error) {
       return rejectWithValue(getApiErrorMessage(error, "Registration failed."));
@@ -136,15 +166,17 @@ export const logout = createAsyncThunk("auth/logout", async () => {
   }
 });
 
-export const activateMembership = createAsyncThunk(
-  "auth/activateMembership",
-  async (planId: "monthly" | "yearly", { rejectWithValue }) => {
+export const payMembership = createAsyncThunk(
+  "auth/payMembership",
+  async (
+    input: { planId: MembershipPlanId; card: TokenizeCardFields },
+    { rejectWithValue },
+  ) => {
     try {
-      const membership = await membershipService.activate(planId);
-      return membership;
+      return await membershipService.payWithAcceptJs(input.planId, input.card);
     } catch (error) {
       return rejectWithValue(
-        getApiErrorMessage(error, "Unable to activate membership."),
+        getApiErrorMessage(error, "Payment failed"),
       );
     }
   },
@@ -182,6 +214,7 @@ const slice = createSlice({
         state.user = action.payload.user;
         state.membership = action.payload.membership;
         state.isMember = action.payload.isMember;
+        state.requiresPlan = action.payload.requiresPlan;
         state.accessToken = action.payload.accessToken;
         state.status = action.payload.user ? "authenticated" : "anonymous";
       })
@@ -190,6 +223,7 @@ const slice = createSlice({
         state.user = null;
         state.membership = null;
         state.isMember = false;
+        state.requiresPlan = false;
         state.accessToken = null;
         state.status = "anonymous";
       })
@@ -201,6 +235,7 @@ const slice = createSlice({
         state.user = action.payload.user;
         state.membership = action.payload.membership;
         state.isMember = action.payload.isMember;
+        state.requiresPlan = action.payload.requiresPlan;
         state.accessToken = action.payload.accessToken;
         state.status = "authenticated";
         state.error = null;
@@ -217,6 +252,7 @@ const slice = createSlice({
         state.user = action.payload.user;
         state.membership = action.payload.membership;
         state.isMember = action.payload.isMember;
+        state.requiresPlan = action.payload.requiresPlan;
         state.accessToken = action.payload.accessToken;
         state.status = "authenticated";
         state.error = null;
@@ -229,20 +265,21 @@ const slice = createSlice({
         state.user = null;
         state.membership = null;
         state.isMember = false;
+        state.requiresPlan = false;
         state.accessToken = null;
         state.status = "anonymous";
         state.error = null;
       })
       .addCase(
-        activateMembership.fulfilled,
-        (state, action: PayloadAction<MembershipRecord>) => {
-          state.membership = action.payload;
-          state.isMember = action.payload.status === "ACTIVE";
+        payMembership.fulfilled,
+        (state, action: PayloadAction<MembershipPayData>) => {
+          state.membership = action.payload.membership;
+          state.isMember = true;
+          state.requiresPlan = false;
         },
       )
-      .addCase(activateMembership.rejected, (state, action) => {
-        state.error =
-          (action.payload as string) || "Membership activation failed.";
+      .addCase(payMembership.rejected, (state, action) => {
+        state.error = (action.payload as string) || "Payment failed.";
       });
   },
 });

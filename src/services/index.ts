@@ -10,6 +10,7 @@ export type {
   AuthUser,
   AuthTokens,
   AuthPayload,
+  AuthMeData,
   LoginInput,
   RegisterInput,
 } from "@/services/auth.service";
@@ -21,7 +22,11 @@ export { auditionService } from "@/services/audition.service";
 export type { AuditionSubmitResult } from "@/services/audition.service";
 
 export { membershipService } from "@/services/membership.service";
-export type { MembershipRecord } from "@/services/membership.service";
+export type {
+  MembershipRecord,
+  MembershipConfig,
+  MembershipPayData,
+} from "@/services/membership.service";
 
 export { chatService } from "@/services/chat.service";
 export type { ChatMessage } from "@/services/chat.service";
