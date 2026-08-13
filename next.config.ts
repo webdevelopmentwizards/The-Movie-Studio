@@ -14,6 +14,29 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      { source: "/guest/login", destination: "/login", permanent: true },
+      { source: "/guest/signup", destination: "/signup", permanent: true },
+      { source: "/guest/auth", destination: "/login", permanent: true },
+      { source: "/auth", destination: "/login", permanent: true },
+      {
+        source: "/membership/dashboard",
+        destination: "/dashboard",
+        permanent: false,
+      },
+      {
+        source: "/membership/pay",
+        destination: "/dashboard/pay",
+        permanent: false,
+      },
+      {
+        source: "/membership/benefits",
+        destination: "/dashboard",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

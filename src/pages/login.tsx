@@ -2,17 +2,65 @@
 
 import Head from "next/head";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useRouter } from "next/router";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import Logo from "@/components/Logo";
+import { useApi } from "@/context/ApiContext";
+import { safeNextPath } from "@/lib/auth/constants";
+import { useAppDispatch, useAppSelector } from "@/store";
+import { clearAuthError, login, selectAuth } from "@/store/apps/auth";
 
 export default function Login() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const auth = useAppSelector(selectAuth);
+  const { toast } = useApi();
   const [showPassword, setShowPassword] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const nextPath = useMemo(
+    () => safeNextPath(router.query.next, "/dashboard"),
+    [router.query.next],
+  );
+
+  useEffect(() => {
+    dispatch(clearAuthError());
+  }, [dispatch]);
+
+  // Already logged in → leave login (middleware also enforces this)
+  useEffect(() => {
+    if (auth.initialized && auth.user && !submitting) {
+      void router.replace(nextPath);
+    }
+  }, [auth.initialized, auth.user, nextPath, router, submitting]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    if (submitting) return;
+
+    const form = event.currentTarget;
+    const email = (
+      form.elements.namedItem("email") as HTMLInputElement
+    ).value.trim();
+    const password = (
+      form.elements.namedItem("password") as HTMLInputElement
+    ).value;
+
+    setSubmitting(true);
+
+    const result = await dispatch(login({ email, password }));
+    setSubmitting(false);
+
+    if (login.fulfilled.match(result)) {
+      toast.success("Signed in successfully");
+      void router.push(nextPath);
+      return;
+    }
+
+    toast.error(
+      (result.payload as string) || "Invalid email or password.",
+    );
   }
 
   return (
@@ -25,35 +73,30 @@ export default function Login() {
         />
       </Head>
 
-      <section className="relative min-h-dvh overflow-hidden bg-zinc-950">
+      <section className="relative min-h-dvh overflow-x-hidden bg-zinc-950">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/10 via-zinc-950 to-zinc-950" />
         <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,#27272a_1px,transparent_1px),linear-gradient(to_bottom,#27272a_1px,transparent_1px)] [background-size:48px_48px]" />
 
-        <div className="relative mx-auto grid min-h-dvh max-w-7xl grid-cols-1 items-stretch lg:grid-cols-2">
-          {/* Visual / brand panel */}
-          <div className="relative hidden flex-col justify-between overflow-hidden border-r border-zinc-800/80 lg:flex lg:p-8 xl:p-12">
+        <div className="relative grid min-h-dvh w-full grid-cols-1 items-stretch lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="relative hidden flex-col justify-center overflow-hidden border-r border-zinc-800/80 lg:flex lg:px-12 lg:py-12 xl:px-16">
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
 
-            <div className="relative">
-              <Logo size="lg" priority />
-            </div>
-
-            <div className="relative">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-400">
+            <div className="relative max-w-lg">
+              <Logo size="md" priority />
+              <p className="mt-10 text-[10px] font-medium uppercase tracking-[0.18em] text-amber-400">
                 Welcome back
               </p>
-              <h2 className="mt-4 max-w-md text-2xl font-bold leading-tight text-zinc-50 lg:text-3xl xl:text-4xl">
+              <h2 className="mt-3 text-2xl font-bold leading-tight text-zinc-50 lg:text-3xl">
                 Your front-row seat to unforgettable stories.
               </h2>
-              <p className="mt-4 max-w-sm text-sm leading-relaxed text-zinc-400">
-                Sign in to pick up where you left off, build your watchlist, and
-                discover new releases every week.
+              <p className="mt-4 text-sm leading-relaxed text-zinc-400">
+                Sign in to open your member dashboard, unlock velvet-rope
+                benefits, and pick up where you left off.
               </p>
             </div>
           </div>
 
-          {/* Form panel */}
           <div className="flex items-center justify-center px-5 py-10 sm:px-8 sm:py-12 lg:px-12">
             <div className="w-full max-w-md">
               <div className="mb-7 lg:hidden">
@@ -67,19 +110,17 @@ export default function Login() {
                 <p className="mt-2 text-sm text-zinc-400">
                   Don&apos;t have an account?{" "}
                   <Link
-                    href="/signup"
+                    href={
+                      nextPath === "/dashboard"
+                        ? "/signup"
+                        : `/signup?next=${encodeURIComponent(nextPath)}`
+                    }
                     className="font-semibold text-amber-400 transition-colors hover:text-amber-300"
                   >
                     Create one
                   </Link>
                 </p>
               </div>
-
-              {submitted && (
-                <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                  Signing you in… (demo — no backend connected yet)
-                </div>
-              )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
@@ -95,7 +136,8 @@ export default function Login() {
                     type="email"
                     autoComplete="email"
                     required
-                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500"
+                    disabled={submitting}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500 disabled:opacity-60"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -122,14 +164,17 @@ export default function Login() {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       required
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 pr-12 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500"
+                      disabled={submitting}
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 pr-12 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500 disabled:opacity-60"
                       placeholder="••••••••"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-zinc-500 transition-colors hover:text-amber-400"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
                     >
                       {showPassword ? "Hide" : "Show"}
                     </button>
@@ -147,9 +192,10 @@ export default function Login() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-full bg-amber-500 py-3.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400"
+                  disabled={submitting}
+                  className="w-full rounded-full bg-amber-500 py-3.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-60"
                 >
-                  Sign In
+                  {submitting ? "Signing in…" : "Sign In"}
                 </button>
               </form>
 

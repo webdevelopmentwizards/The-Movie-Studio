@@ -2,9 +2,19 @@
 
 import Head from "next/head";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useRouter } from "next/router";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import Logo from "@/components/Logo";
+import { useApi } from "@/context/ApiContext";
+import { safeNextPath } from "@/lib/auth/constants";
+import { setMemberPending } from "@/lib/memberSession";
+import {
+  isMembershipPlanId,
+  type MembershipPlanId,
+} from "@/lib/membershipPlans";
+import { useAppDispatch, useAppSelector } from "@/store";
+import { register, selectAuth } from "@/store/apps/auth";
 
 const perks = [
   "Unlimited streaming in 4K HDR",
@@ -13,13 +23,80 @@ const perks = [
   "Watch on any device, anywhere",
 ];
 
-export default function Signup() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+function planIdFromNext(nextPath: string): MembershipPlanId | null {
+  try {
+    const url = new URL(nextPath, "http://local");
+    if (!url.pathname.startsWith("/dashboard/pay")) return null;
+    const plan = url.searchParams.get("plan");
+    return isMembershipPlanId(plan) ? plan : "yearly";
+  } catch {
+    return null;
+  }
+}
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+export default function Signup() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const auth = useAppSelector(selectAuth);
+  const { toast } = useApi();
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const nextPath = useMemo(
+    () => safeNextPath(router.query.next, "/membership"),
+    [router.query.next],
+  );
+
+  const loginHref = useMemo(() => {
+    if (nextPath === "/membership") return "/login";
+    return `/login?next=${encodeURIComponent(nextPath)}`;
+  }, [nextPath]);
+
+  useEffect(() => {
+    if (auth.initialized && auth.user && !submitting) {
+      void router.replace(nextPath);
+    }
+  }, [auth.initialized, auth.user, nextPath, router, submitting]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    if (submitting) return;
+
+    const form = event.currentTarget;
+    const fullName = (
+      form.elements.namedItem("name") as HTMLInputElement
+    ).value.trim();
+    const email = (
+      form.elements.namedItem("email") as HTMLInputElement
+    ).value.trim();
+    const password = (
+      form.elements.namedItem("password") as HTMLInputElement
+    ).value;
+
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    const firstName = parts[0] || fullName;
+    const lastName = parts.slice(1).join(" ") || undefined;
+
+    setSubmitting(true);
+
+    const result = await dispatch(
+      register({ email, password, firstName, lastName }),
+    );
+    setSubmitting(false);
+
+    if (register.fulfilled.match(result)) {
+      const planId = planIdFromNext(nextPath);
+      if (planId) {
+        setMemberPending({ name: fullName, email, planId });
+      }
+      toast.success("Account created successfully");
+      void router.push(nextPath);
+      return;
+    }
+
+    toast.error(
+      (result.payload as string) || "Unable to create your account.",
+    );
   }
 
   return (
@@ -32,12 +109,11 @@ export default function Signup() {
         />
       </Head>
 
-      <section className="relative min-h-dvh overflow-hidden bg-zinc-950">
+      <section className="relative min-h-dvh overflow-x-hidden bg-zinc-950">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/10 via-zinc-950 to-zinc-950" />
         <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,#27272a_1px,transparent_1px),linear-gradient(to_bottom,#27272a_1px,transparent_1px)] [background-size:48px_48px]" />
 
         <div className="relative mx-auto grid min-h-dvh max-w-7xl grid-cols-1 items-stretch lg:grid-cols-2">
-          {/* Visual / brand panel */}
           <div className="relative hidden flex-col justify-between overflow-hidden border-r border-zinc-800/80 lg:flex lg:p-8 xl:p-12">
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
@@ -79,7 +155,6 @@ export default function Signup() {
             </div>
           </div>
 
-          {/* Form panel */}
           <div className="flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
             <div className="w-full max-w-md">
               <div className="mb-6 lg:hidden">
@@ -93,19 +168,13 @@ export default function Signup() {
                 <p className="mt-2 text-sm text-zinc-400">
                   Already have an account?{" "}
                   <Link
-                    href="/login"
+                    href={loginHref}
                     className="font-semibold text-amber-400 transition-colors hover:text-amber-300"
                   >
                     Sign in
                   </Link>
                 </p>
               </div>
-
-              {submitted && (
-                <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
-                  Creating your account… (demo — no backend connected yet)
-                </div>
-              )}
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -121,7 +190,8 @@ export default function Signup() {
                     type="text"
                     autoComplete="name"
                     required
-                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500"
+                    disabled={submitting}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500 disabled:opacity-60"
                     placeholder="John Doe"
                   />
                 </div>
@@ -139,7 +209,8 @@ export default function Signup() {
                     type="email"
                     autoComplete="email"
                     required
-                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500"
+                    disabled={submitting}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500 disabled:opacity-60"
                     placeholder="you@example.com"
                   />
                 </div>
@@ -159,14 +230,17 @@ export default function Signup() {
                       autoComplete="new-password"
                       required
                       minLength={8}
-                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 pr-12 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500"
+                      disabled={submitting}
+                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 pr-12 text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-amber-500 disabled:opacity-60"
                       placeholder="At least 8 characters"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-zinc-500 transition-colors hover:text-amber-400"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
                     >
                       {showPassword ? "Hide" : "Show"}
                     </button>
@@ -178,6 +252,7 @@ export default function Signup() {
                     type="checkbox"
                     name="terms"
                     required
+                    disabled={submitting}
                     className="mt-0.5 h-4 w-4 rounded border-zinc-700 bg-zinc-950 accent-amber-500"
                   />
                   <span>
@@ -201,12 +276,12 @@ export default function Signup() {
 
                 <button
                   type="submit"
-                  className="w-full rounded-full bg-amber-500 py-3.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400"
+                  disabled={submitting}
+                  className="w-full rounded-full bg-amber-500 py-3.5 text-sm font-bold text-zinc-950 transition-colors hover:bg-amber-400 disabled:opacity-60"
                 >
-                  Create Account
+                  {submitting ? "Creating account…" : "Create Account"}
                 </button>
               </form>
-
             </div>
           </div>
         </div>

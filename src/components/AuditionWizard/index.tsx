@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import {
@@ -8,6 +9,7 @@ import {
   AUDITION_MAX_VIDEO_BYTES,
   AUDITION_MAX_VIDEO_MB,
 } from "@/lib/auditionLimits";
+import { useApi } from "@/context/ApiContext";
 
 type WizardStep = "dialogue" | "video" | "photo";
 
@@ -127,6 +129,7 @@ const inputClassName =
   "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500 disabled:opacity-60";
 
 export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps) {
+  const { audition, toast, getErrorMessage } = useApi();
   const [step, setStep] = useState<WizardStep>("dialogue");
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -234,6 +237,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     const error = validateSubmit();
     if (error) {
       setSubmitError(error);
+      toast.warning(error);
       return;
     }
     if (!videoFile || !photoFile) return;
@@ -249,21 +253,14 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       formData.append("video", videoFile);
       formData.append("photo", photoFile);
 
-      const response = await fetch("/api/audition/submit", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = (await response.json()) as { ok: boolean; error?: string };
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Submission failed.");
-      }
+      await audition.submit(formData);
 
       setSubmitSuccess(true);
+      toast.success("Audition submitted successfully");
     } catch (err) {
-      setSubmitError(
-        err instanceof Error ? err.message : "Submission failed.",
-      );
+      const message = getErrorMessage(err, "Submission failed.");
+      setSubmitError(message);
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -358,15 +355,29 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
           {step === "photo" && (
             <div className="space-y-4">
               {submitSuccess ? (
-                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-6 text-center">
-                  <p className="text-lg font-bold text-emerald-400">
-                    Submission received
-                  </p>
-                  <p className="mt-2 text-sm text-zinc-300">
-                    Thanks{firstName.trim() ? `, ${firstName.trim()}` : ""}.
-                    We&apos;ve emailed you a confirmation and our team will
-                    review your audition shortly.
-                  </p>
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-6 text-center">
+                    <p className="text-lg font-bold text-emerald-400">
+                      Submission received
+                    </p>
+                    <p className="mt-2 text-sm text-zinc-300">
+                      Thanks{firstName.trim() ? `, ${firstName.trim()}` : ""}.
+                      We&apos;ve emailed you a confirmation and our team will
+                      review your audition shortly.
+                    </p>
+                  </div>
+                  <Link
+                    href="/membership"
+                    className="block rounded-xl border border-amber-500/40 bg-amber-500/10 px-5 py-4 text-center transition-colors hover:bg-amber-500/15"
+                  >
+                    <p className="text-sm font-bold leading-snug text-amber-300 sm:text-base">
+                      Become a Movie Studio Member and Receive Valuable Access
+                      Behind the Velvet Rope!
+                    </p>
+                    <p className="mt-2 text-xs font-semibold text-amber-400">
+                      Explore Membership →
+                    </p>
+                  </Link>
                 </div>
               ) : (
                 <>

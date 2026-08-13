@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { FormEvent, useState, type ReactNode } from "react";
 
 import {
@@ -15,6 +16,9 @@ import {
 } from "./icons";
 
 import { CDN_ASSETS_BASE } from "@/constants/cdn";
+import { useApi } from "@/context/ApiContext";
+import { useAppDispatch } from "@/store";
+import { login, register } from "@/store/apps/auth";
 
 const LOGO_SRC = `${CDN_ASSETS_BASE}/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png`;
 
@@ -177,14 +181,54 @@ function SocialProof({ compact = false }: { compact?: boolean }) {
 }
 
 export default function LoginSignUpPage() {
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { toast } = useApi();
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPass, setShowPass] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitted(true);
+    if (submitting) return;
+
+    const form = event.currentTarget;
+    const email = (
+      form.elements.namedItem("email") as HTMLInputElement
+    ).value.trim();
+    const password = (
+      form.elements.namedItem("password") as HTMLInputElement
+    ).value;
+
+    setSubmitting(true);
+
+    if (mode === "login") {
+      const result = await dispatch(login({ email, password }));
+      setSubmitting(false);
+      if (login.fulfilled.match(result)) {
+        toast.success("Signed in successfully");
+        void router.push(
+          result.payload.isMember ? "/dashboard" : "/membership",
+        );
+        return;
+      }
+      toast.error((result.payload as string) || "Invalid credentials.");
+      return;
+    }
+
+    const firstName = (
+      form.elements.namedItem("firstName") as HTMLInputElement
+    ).value.trim();
+
+    const result = await dispatch(register({ email, password, firstName }));
+    setSubmitting(false);
+    if (register.fulfilled.match(result)) {
+      toast.success("Account created successfully");
+      void router.push("/membership");
+      return;
+    }
+    toast.error((result.payload as string) || "Unable to create account.");
   }
 
   return (
@@ -283,14 +327,6 @@ export default function LoginSignUpPage() {
                   : "Free to join. Pay only when you rent or buy."}
               </p>
             </div>
-
-            {submitted && (
-              <div className="mb-5 rounded-xl border border-[#5DB9BF]/30 bg-[#5DB9BF]/10 px-4 py-3 text-sm font-medium text-[#3E9AA0]">
-                {mode === "login"
-                  ? "Signing you in… (demo — no backend connected yet)"
-                  : "Creating your account… (demo — no backend connected yet)"}
-              </div>
-            )}
 
             <div className="mb-4 lg:hidden">
               <SocialButtons compact />
@@ -428,11 +464,19 @@ export default function LoginSignUpPage() {
 
               <button
                 type="submit"
-                disabled={mode === "signup" && !agreed}
+                disabled={submitting || (mode === "signup" && !agreed)}
                 className="mt-1 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border-none bg-gradient-to-br from-[#5DB9BF] to-[#3E9AA0] px-3 py-2.5 text-sm font-extrabold text-white shadow-[0_6px_20px_-8px_#5DB9BF] transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50 lg:mt-2 lg:gap-2 lg:rounded-[14px] lg:px-4 lg:py-3.5 lg:text-[15px] lg:shadow-[0_8px_24px_-8px_#5DB9BF]"
               >
-                {mode === "login" ? "Log In" : "Create My Account"}
-                <ArrowRightIcon className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                {submitting
+                  ? mode === "login"
+                    ? "Signing in…"
+                    : "Creating account…"
+                  : mode === "login"
+                    ? "Log In"
+                    : "Create My Account"}
+                {!submitting && (
+                  <ArrowRightIcon className="h-3.5 w-3.5 lg:h-4 lg:w-4" />
+                )}
               </button>
             </form>
 

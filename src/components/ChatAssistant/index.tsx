@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import ChatMessageContent from "./ChatMessageContent";
+import { useApi } from "@/context/ApiContext";
 
 type Message = {
   id: string;
@@ -63,6 +64,7 @@ function LoadingSpinner() {
 }
 
 export default function ChatAssistant() {
+  const { chat, getErrorMessage } = useApi();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
@@ -114,31 +116,21 @@ export default function ChatAssistant() {
         .filter((msg) => msg.id !== "welcome")
         .map(({ role, content }) => ({ role, content }));
 
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: payload }),
-      });
-
-      const data = (await response.json()) as { reply?: string; error?: string };
-
-      if (!response.ok) {
-        throw new Error(data.error ?? "Request failed");
-      }
+      const reply = await chat.send(payload);
 
       setMessages((prev) => [
         ...prev,
         {
           id: createId(),
           role: "assistant",
-          content: data.reply ?? "Sorry, I couldn't generate a response.",
+          content: reply || "Sorry, I couldn't generate a response.",
         },
       ]);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Something went wrong. Please try again.";
+      const message = getErrorMessage(
+        error,
+        "Something went wrong. Please try again.",
+      );
 
       setMessages((prev) => [
         ...prev,

@@ -6,6 +6,7 @@ import SocialLinks from "@/components/SocialLinks";
 const footerLinks = {
   company: [
     { href: "/about", label: "About Us" },
+    { href: "/membership", label: "Membership" },
     { href: "/contact", label: "Contact Us" },
     { href: "/movies", label: "All Movies" },
   ],

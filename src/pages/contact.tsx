@@ -4,12 +4,13 @@ import Head from "next/head";
 import { FormEvent, useState } from "react";
 
 import PageHero from "@/components/PageHero";
+import { useApi } from "@/context/ApiContext";
 
 type SubmitState = "idle" | "submitting" | "success" | "error";
 
 export default function Contact() {
+  const { contact, toast, getErrorMessage } = useApi();
   const [status, setStatus] = useState<SubmitState>("idle");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,38 +20,28 @@ export default function Contact() {
     const formData = new FormData(form);
 
     setStatus("submitting");
-    setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: String(formData.get("name") || ""),
-          email: String(formData.get("email") || ""),
-          subject: String(formData.get("subject") || ""),
-          message: String(formData.get("message") || ""),
-          company: String(formData.get("company") || ""),
-        }),
+      await contact.submit({
+        name: String(formData.get("name") || ""),
+        email: String(formData.get("email") || ""),
+        subject: String(formData.get("subject") || ""),
+        message: String(formData.get("message") || ""),
+        company: String(formData.get("company") || ""),
       });
-
-      const data = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-      };
-
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || "Unable to send your message.");
-      }
 
       setStatus("success");
       form.reset();
+      toast.success("Message sent", {
+        description: "We'll get back to you within 2 business days.",
+      });
     } catch (error) {
       setStatus("error");
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to send your message. Please try again.",
+      toast.error(
+        getErrorMessage(
+          error,
+          "Unable to send your message. Please try again.",
+        ),
       );
     }
   }
@@ -193,15 +184,6 @@ export default function Contact() {
                     placeholder="Tell us how we can help..."
                   />
                 </div>
-
-                {errorMessage && (
-                  <p
-                    role="alert"
-                    className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
-                  >
-                    {errorMessage}
-                  </p>
-                )}
 
                 <button
                   type="submit"
