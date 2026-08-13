@@ -340,19 +340,6 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
                 </div>
               </div>
 
-              <p className="text-[11px] leading-relaxed text-zinc-500">
-                Sandbox test cards: Visa{" "}
-                <span className="font-medium text-zinc-300">
-                  4111 1111 1111 1111
-                </span>
-                {" "}or Mastercard{" "}
-                <span className="font-medium text-zinc-300">
-                  5424 0000 0000 0015
-                </span>
-                , any future expiry, CVV{" "}
-                <span className="font-medium text-zinc-300">900</span>.
-              </p>
-
               <button
                 type="submit"
                 disabled={submitting || !(auth.user || _props.user)}
