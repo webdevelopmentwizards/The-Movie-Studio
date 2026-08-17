@@ -7,6 +7,7 @@ export const MEMBERSHIP_BASE_BENEFITS = [
   "Watch new releases with no ads",
   "Access to VIP movie parties, step-and-repeat events, and more",
   "Access to Movie Studio merchandise/gear",
+  "Networking Opportunities",
 ] as const;
 
 export const MEMBERSHIP_YEARLY_MERCH = [

@@ -16,6 +16,9 @@ const navLinks = [
   { href: "/contact", label: "Contact" },
 ];
 
+const premiumCtaClass =
+  "inline-flex items-center justify-center rounded-full border border-amber-400/70 bg-amber-500/10 px-4 py-2 text-center text-xs font-semibold text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.18)] transition-colors hover:bg-amber-500 hover:text-zinc-950 sm:text-sm";
+
 export default function Navbar() {
   const router = useRouter();
   const { session, isLoggedIn, requiresPlan, logout } = useMemberSession();
@@ -36,6 +39,20 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
+  useEffect(() => {
+    setOpen(false);
+    setAccountOpen(false);
+  }, [router.asPath]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
   function handleLogout() {
     logout();
     setAccountOpen(false);
@@ -45,16 +62,16 @@ export default function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-md">
-      <nav className="flex h-20 w-full items-center justify-between px-4 sm:px-6 lg:px-10 xl:px-14 md:h-24">
-        <Logo priority />
+      <nav className="mx-auto flex h-16 w-full max-w-[1600px] items-center justify-between gap-3 px-4 sm:h-20 sm:px-6 lg:px-10 xl:h-24 xl:px-14">
+        <Logo priority className="min-w-0" />
 
-        <div className="hidden items-center gap-8 md:flex">
+        <div className="hidden min-w-0 items-center gap-4 xl:flex xl:gap-6 2xl:gap-8">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onPointerDown={markHeroAudioUnlocked}
-              className="text-sm font-medium text-zinc-400 transition-colors hover:text-amber-400"
+              className="shrink-0 text-sm font-medium text-zinc-400 transition-colors hover:text-amber-400"
             >
               {link.label}
             </Link>
@@ -62,13 +79,13 @@ export default function Navbar() {
           <Link
             href="/movies"
             onPointerDown={markHeroAudioUnlocked}
-            className="rounded-full bg-amber-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400"
+            className="shrink-0 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-amber-400 2xl:px-5"
           >
             Browse Movies
           </Link>
 
           {isLoggedIn && session ? (
-            <div className="relative" ref={accountRef}>
+            <div className="relative shrink-0" ref={accountRef}>
               <button
                 type="button"
                 onClick={() => setAccountOpen((v) => !v)}
@@ -126,11 +143,11 @@ export default function Navbar() {
             </div>
           ) : (
             <Link
-              href="/login"
+              href="/signup"
               onPointerDown={markHeroAudioUnlocked}
-              className="text-sm font-medium text-zinc-400 transition-colors hover:text-amber-400"
+              className={`${premiumCtaClass} shrink-0 whitespace-nowrap`}
             >
-              Sign In
+              Become A Premium Member
             </Link>
           )}
         </div>
@@ -138,23 +155,24 @@ export default function Navbar() {
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 md:hidden"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-zinc-300 xl:hidden"
           aria-label="Toggle menu"
+          aria-expanded={open}
         >
           {open ? "✕" : "☰"}
         </button>
       </nav>
 
       {open && (
-        <div className="animate-menu-in absolute inset-x-0 top-full z-50 border-t border-zinc-800 bg-zinc-950 px-4 py-4 shadow-xl shadow-black/40 sm:px-6 lg:px-10 xl:px-14 md:hidden">
-          <div className="flex flex-col gap-3">
+        <div className="absolute inset-x-0 top-full z-50 max-h-[calc(100dvh-4rem)] overflow-y-auto border-t border-zinc-800 bg-zinc-950 px-4 py-4 shadow-xl shadow-black/40 sm:max-h-[calc(100dvh-5rem)] sm:px-6 lg:px-10 xl:hidden">
+          <div className="flex flex-col gap-2">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onPointerDown={markHeroAudioUnlocked}
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-2 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-amber-400"
+                className="rounded-lg px-2 py-2.5 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-amber-400"
               >
                 {link.label}
               </Link>
@@ -193,11 +211,11 @@ export default function Navbar() {
               </>
             ) : (
               <Link
-                href="/login"
+                href="/signup"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-2 py-2 text-sm font-medium text-zinc-300"
+                className={`${premiumCtaClass} mt-1 w-full`}
               >
-                Sign In
+                Become A Premium Member
               </Link>
             )}
           </div>

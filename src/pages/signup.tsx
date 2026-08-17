@@ -22,6 +22,7 @@ const perks = [
   "Personalized watchlists & recommendations",
   "New releases every single week",
   "Watch on any device, anywhere",
+  "Networking Opportunities",
 ];
 
 function planIdFromNext(nextPath: string): MembershipPlanId | null {
