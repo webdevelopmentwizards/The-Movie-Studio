@@ -12,7 +12,7 @@ export const MEMBERSHIP_BASE_BENEFITS = [
 export const MEMBERSHIP_PLANS = {
   monthly: {
     id: "monthly" as const,
-    name: "Monthly membership",
+    name: "Monthly Membership",
     amount: "9.99",
     priceLabel: "$9.99",
     period: "per month",
@@ -23,7 +23,7 @@ export const MEMBERSHIP_PLANS = {
   },
   yearly: {
     id: "yearly" as const,
-    name: "Premium membership",
+    name: "Premium Membership",
     amount: "89.99",
     priceLabel: "$89.99",
     period: "per year",

@@ -3,10 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { CDN_ASSETS_BASE } from "@/constants/cdn";
 import { markHeroAudioUnlocked } from "@/utils/heroAudio";
 
-const LOGO_SRC = `${CDN_ASSETS_BASE}/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png`;
+const LOGO_SRC = "/logo-movie-studio.png";
 
 interface LogoProps {
   className?: string;
@@ -34,10 +33,10 @@ export default function Logo({
       <Image
         src={LOGO_SRC}
         alt="The Movie Studio"
-        width={360}
-        height={72}
+        width={2287}
+        height={327}
         priority={priority}
-        className={sizeClasses[size]}
+        className={`${sizeClasses[size]} object-contain object-left`}
       />
     </Link>
   );
