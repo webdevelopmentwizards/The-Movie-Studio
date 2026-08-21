@@ -36,7 +36,7 @@ export default function HomeAuditionCTA() {
                 Start Your Audition
               </button>
               <p className="text-xs text-zinc-500">
-                Scene · Video · Photo — takes about 5 minutes
+                Films · Scene · Video · Photo — takes about 5 minutes
               </p>
             </div>
 
