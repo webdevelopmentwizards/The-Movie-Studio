@@ -5,6 +5,7 @@ import HeroBanner from "@/components/HeroBanner";
 import HomeAuditionCTA from "@/components/HomeAuditionCTA";
 import HomeAboutSection from "@/components/HomeAboutSection";
 import HomeContactSection from "@/components/HomeContactSection";
+import HomePremiumMemberSection from "@/components/HomePremiumMemberSection";
 import MovieSwiper from "@/components/MovieSwiper";
 import NewReleasesSwiper from "@/components/NewReleasesSwiper";
 import { heroSlides } from "@/data/heroSlides";
@@ -35,6 +36,8 @@ export default function Home() {
       <HomeContactSection />
 
       <NewReleasesSwiper movies={movies} />
+
+      <HomePremiumMemberSection />
 
       <MovieSwiper
         title="Featured Films"
