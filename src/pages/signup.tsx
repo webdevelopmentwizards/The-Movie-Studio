@@ -23,6 +23,9 @@ const perks = [
   "New releases every single week",
   "Watch on any device, anywhere",
   "Networking Opportunities",
+  "Premium access to new releases",
+  "Custom access to the Movie Studio private channel",
+  "Meet the producers, directors and stars",
 ];
 
 function planIdFromNext(nextPath: string): MembershipPlanId | null {
@@ -121,23 +124,23 @@ export default function Signup() {
         />
       </Head>
 
-      <section className="relative min-h-dvh overflow-x-hidden bg-zinc-950">
+      <section className="relative h-dvh overflow-hidden bg-zinc-950">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/10 via-zinc-950 to-zinc-950" />
         <div className="absolute inset-0 opacity-20 [background-image:linear-gradient(to_right,#27272a_1px,transparent_1px),linear-gradient(to_bottom,#27272a_1px,transparent_1px)] [background-size:48px_48px]" />
 
-        <div className="relative mx-auto grid min-h-dvh max-w-7xl grid-cols-1 items-stretch lg:grid-cols-2">
-          <div className="relative hidden flex-col justify-between overflow-hidden border-r border-zinc-800/80 lg:flex lg:p-8 xl:p-12">
+        <div className="relative grid h-full grid-cols-1 lg:grid-cols-2">
+          <div className="relative hidden h-full overflow-hidden border-r border-zinc-800/80 bg-zinc-950 lg:flex lg:flex-col lg:justify-center lg:gap-10 lg:px-10 lg:py-12 xl:gap-12 xl:px-16 2xl:px-24">
             <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-amber-500/20 blur-3xl" />
             <div className="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-amber-500/10 blur-3xl" />
 
             <div className="relative">
               <Logo size="lg" priority />
             </div>
-            <div className="relative">
+            <div className="relative max-w-xl">
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-400">
                 Join the studio
               </p>
-              <h2 className="mt-4 max-w-md text-2xl font-bold leading-tight text-zinc-50 lg:text-3xl xl:text-4xl">
+              <h2 className="mt-4 text-2xl font-bold leading-tight text-zinc-50 lg:text-3xl xl:text-4xl">
                 Lights. Camera. Your next favorite story.
               </h2>
               <ul className="mt-6 space-y-3">
@@ -167,7 +170,7 @@ export default function Signup() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center px-5 py-8 sm:px-8 lg:px-12">
+          <div className="flex h-full items-center justify-center overflow-y-auto px-5 py-8 sm:px-8 lg:px-12 xl:px-16">
             <div className="w-full max-w-md">
               <div className="mb-6 lg:hidden">
                 <Logo size="md" priority />

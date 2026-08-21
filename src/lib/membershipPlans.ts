@@ -1,23 +1,13 @@
 export type MembershipPlanId = "monthly" | "yearly";
 
 export const MEMBERSHIP_BASE_BENEFITS = [
-  "Behind-the-scenes footage",
+  "Behind-the-scenes!",
   "Live on-location access",
   "First look at upcoming movie projects",
   "Watch new releases with no ads",
   "Access to VIP movie parties, step-and-repeat events, and more",
   "Access to Movie Studio merchandise/gear",
   "Networking Opportunities",
-] as const;
-
-export const MEMBERSHIP_YEARLY_MERCH = [
-  "T-shirts",
-  "Hats",
-  "Mugs",
-  "Computer/laptop cases",
-  "Car decals",
-  "Posters",
-  "Other branded merchandise",
 ] as const;
 
 export const MEMBERSHIP_PLANS = {
@@ -42,12 +32,13 @@ export const MEMBERSHIP_PLANS = {
     description:
       "Best value — everything in Monthly, plus exclusive Movie Studio merch.",
     badge: "Best Value",
-    benefits: [...MEMBERSHIP_BASE_BENEFITS],
-    extraBenefits: [
-      "Movie Studio merchandise, including:",
-      ...MEMBERSHIP_YEARLY_MERCH.map((item) => item),
+    benefits: [
+      ...MEMBERSHIP_BASE_BENEFITS,
+      "Premium access to new releases",
+      "Access custom Movie Studio, Swag, t-shirts, hats, and more!",
+      "Custom access to the Movie Studio private channel",
+      "Meet the producers, directors and stars",
     ],
-    merchItems: [...MEMBERSHIP_YEARLY_MERCH],
   },
 } as const;
 

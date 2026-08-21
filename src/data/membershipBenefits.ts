@@ -21,7 +21,7 @@ export const MEMBERSHIP_BENEFIT_SECTIONS: BenefitSection[] = [
   {
     id: "bts",
     eyebrow: "Exclusive",
-    title: "Behind-the-scenes footage",
+    title: "Behind-the-scenes!",
     subtitle:
       "Go past the final cut — watch how scenes were shot, directed, and cut together.",
     items: [

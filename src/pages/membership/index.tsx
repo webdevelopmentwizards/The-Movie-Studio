@@ -49,7 +49,6 @@ export default function MembershipPage() {
             {PLAN_ORDER.map((id) => {
               const plan = MEMBERSHIP_PLANS[id];
               const isSelected = selected === id;
-              const isYearly = id === "yearly";
 
               return (
                 <button
@@ -91,24 +90,6 @@ export default function MembershipPage() {
                         {benefit}
                       </li>
                     ))}
-                    {isYearly && (
-                      <>
-                        <li className="pt-2 text-xs font-semibold text-amber-300 sm:text-sm">
-                          Yearly extras — Movie Studio merchandise, including:
-                        </li>
-                        {MEMBERSHIP_PLANS.yearly.merchItems.map((item) => (
-                          <li
-                            key={item}
-                            className="flex items-start gap-2 pl-4 text-xs leading-relaxed text-amber-200/90 sm:text-sm"
-                          >
-                            <span className="mt-0.5 text-amber-400" aria-hidden>
-                              +
-                            </span>
-                            {item}
-                          </li>
-                        ))}
-                      </>
-                    )}
                   </ul>
                 </button>
               );
