@@ -24,8 +24,9 @@ const perks = [
   "Watch on any device, anywhere",
   "Networking Opportunities",
   "Premium access to new releases",
+  "Includes t-shirts, hats, posters and more.",
   "Custom access to the Movie Studio private channel",
-  "Meet the producers, directors and stars",
+  "Email access to the producers and directors",
 ];
 
 function planIdFromNext(nextPath: string): MembershipPlanId | null {
@@ -137,23 +138,23 @@ export default function Signup() {
               <Logo size="lg" priority />
             </div>
             <div className="relative max-w-xl">
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-400">
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-amber-400">
                 Join the studio
               </p>
-              <h2 className="mt-4 text-2xl font-bold leading-tight text-zinc-50 lg:text-3xl xl:text-4xl">
+              <h2 className="mt-3 text-xl font-bold leading-tight text-zinc-50 lg:text-2xl xl:text-3xl">
                 Lights. Camera. Your next favorite story.
               </h2>
-              <ul className="mt-6 space-y-3">
+              <ul className="mt-4 space-y-2">
                 {perks.map((perk) => (
                   <li
                     key={perk}
-                    className="flex items-center gap-3 text-sm text-zinc-300"
+                    className="flex items-center gap-2.5 text-xs text-zinc-300"
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
                       <svg
                         viewBox="0 0 20 20"
                         fill="currentColor"
-                        className="h-3.5 w-3.5"
+                        className="h-3 w-3"
                         aria-hidden
                       >
                         <path

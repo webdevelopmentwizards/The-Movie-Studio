@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 
-import BehindTheScenesButton from "@/components/BehindTheScenesButton";
+import MovieMemberCta from "@/components/MovieMemberCta";
 import WatchTrailerButton from "@/components/WatchTrailerButton";
 import type { Movie } from "@/types/movie";
 
@@ -34,7 +34,7 @@ export default function MovieDetailActions({ movie }: MovieDetailActionsProps) {
           autoOpen={autoOpenTrailer}
         />
       )}
-      <BehindTheScenesButton />
+      <MovieMemberCta />
       <Link
         href="/movies"
         className="rounded-full border border-zinc-600 px-6 py-3 text-center text-sm font-semibold text-zinc-200 transition-colors hover:border-amber-500 hover:text-amber-400"

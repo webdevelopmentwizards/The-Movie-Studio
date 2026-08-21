@@ -55,7 +55,7 @@ export default function MembershipPage() {
                   key={id}
                   type="button"
                   onClick={() => setSelected(id)}
-                  className={`relative rounded-2xl border p-6 text-left transition-colors sm:p-7 ${
+                  className={`relative flex h-full flex-col justify-start rounded-2xl border p-6 text-left transition-colors sm:p-7 ${
                     isSelected
                       ? "border-amber-500 bg-amber-500/10"
                       : "border-zinc-800 bg-zinc-900/40 hover:border-zinc-600"

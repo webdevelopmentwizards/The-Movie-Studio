@@ -13,14 +13,15 @@ export default function HomeAuditionCTA() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-20%,rgba(245,158,11,0.12),transparent)]" />
 
         <div className="relative mx-auto max-w-7xl px-4 py-14 sm:px-6 sm:py-20">
-          <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-medium uppercase tracking-[0.25em] text-amber-400">
-              Your Breakout Role Awaits
-            </p>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl md:text-5xl">
-              Be in Our Movies. Submit Your Audition Today!
+          <div className="text-center">
+            <h2 className="whitespace-nowrap text-[clamp(0.7rem,3.4vw,2.75rem)] font-bold uppercase tracking-wide text-amber-400">
+              WATCH OUR MOVIES! BE IN OUR MOVIES!
             </h2>
-            <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+            <div className="mx-auto max-w-3xl">
+            <p className="mt-4 text-xl font-bold leading-relaxed text-zinc-50 sm:text-2xl">
+              Be in Our Movies. Submit Your Audition Today!
+            </p>
+            <p className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
               Whether you&apos;re chasing your first on-screen moment or ready
               for your next big role — record your scene, upload your media, and
               put yourself in front of our casting team. Real films. Real
@@ -67,6 +68,7 @@ export default function HomeAuditionCTA() {
                   </p>
                 </div>
               ))}
+            </div>
             </div>
           </div>
         </div>

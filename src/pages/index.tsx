@@ -4,7 +4,6 @@ import Link from "next/link";
 import HeroBanner from "@/components/HeroBanner";
 import HomeAuditionCTA from "@/components/HomeAuditionCTA";
 import HomeAboutSection from "@/components/HomeAboutSection";
-import HomeContactSection from "@/components/HomeContactSection";
 import HomePremiumMemberSection from "@/components/HomePremiumMemberSection";
 import MovieSwiper from "@/components/MovieSwiper";
 import NewReleasesSwiper from "@/components/NewReleasesSwiper";
@@ -33,11 +32,9 @@ export default function Home() {
 
       <HomeAuditionCTA />
 
-      <HomeContactSection />
+      <HomePremiumMemberSection />
 
       <NewReleasesSwiper movies={movies} />
-
-      <HomePremiumMemberSection />
 
       <MovieSwiper
         title="Featured Films"

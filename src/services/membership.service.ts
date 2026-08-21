@@ -69,8 +69,8 @@ function envFallbackConfig(): MembershipConfig {
         ? "https://js.authorize.net/v1/Accept.js"
         : "https://jstest.authorize.net/v1/Accept.js",
     plans: {
-      monthly: { id: "monthly", label: "Monthly", amount: 9.99 },
-      yearly: { id: "yearly", label: "Yearly", amount: 89.99 },
+      monthly: { id: "monthly", label: "Monthly membership", amount: 9.99 },
+      yearly: { id: "yearly", label: "Premium membership", amount: 89.99 },
     },
   };
 }

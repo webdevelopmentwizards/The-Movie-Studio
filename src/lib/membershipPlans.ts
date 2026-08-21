@@ -6,14 +6,13 @@ export const MEMBERSHIP_BASE_BENEFITS = [
   "First look at upcoming movie projects",
   "Watch new releases with no ads",
   "Access to VIP movie parties, step-and-repeat events, and more",
-  "Access to Movie Studio merchandise/gear",
   "Networking Opportunities",
 ] as const;
 
 export const MEMBERSHIP_PLANS = {
   monthly: {
     id: "monthly" as const,
-    name: "Monthly",
+    name: "Monthly membership",
     amount: "9.99",
     priceLabel: "$9.99",
     period: "per month",
@@ -24,7 +23,7 @@ export const MEMBERSHIP_PLANS = {
   },
   yearly: {
     id: "yearly" as const,
-    name: "Yearly",
+    name: "Premium membership",
     amount: "89.99",
     priceLabel: "$89.99",
     period: "per year",
@@ -35,9 +34,10 @@ export const MEMBERSHIP_PLANS = {
     benefits: [
       ...MEMBERSHIP_BASE_BENEFITS,
       "Premium access to new releases",
-      "Access custom Movie Studio, Swag, t-shirts, hats, and more!",
+      "Includes t-shirts, hats, posters and more.",
+      "Join the team and get free themoviestudio t-shirt and hat",
       "Custom access to the Movie Studio private channel",
-      "Meet the producers, directors and stars",
+      "Email access to the producers and directors",
     ],
   },
 } as const;
