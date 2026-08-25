@@ -17,12 +17,12 @@ export default function About() {
       <section className="border-b border-zinc-800 bg-black py-12 md:py-16">
         <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
           <Image
-            src={`${CDN_ASSETS_BASE}/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png`}
+            src="/moviestudio.png"
             alt="The Movie Studio"
             width={1280}
             height={256}
             priority
-            className="h-auto w-full object-contain"
+            className="h-auto w-full object-contain invert"
           />
         </div>
       </section>

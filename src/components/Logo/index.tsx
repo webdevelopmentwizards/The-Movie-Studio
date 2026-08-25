@@ -5,7 +5,7 @@ import Link from "next/link";
 
 import { markHeroAudioUnlocked } from "@/utils/heroAudio";
 
-const LOGO_SRC = "/logo-movie-studio.png";
+const LOGO_SRC = "/moviestudio.png";
 
 interface LogoProps {
   className?: string;
@@ -36,7 +36,7 @@ export default function Logo({
         width={2287}
         height={327}
         priority={priority}
-        className={`${sizeClasses[size]} object-contain object-left`}
+        className={`${sizeClasses[size]} object-contain object-left invert`}
       />
     </Link>
   );

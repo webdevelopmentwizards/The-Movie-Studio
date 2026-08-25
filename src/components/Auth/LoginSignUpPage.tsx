@@ -15,13 +15,12 @@ import {
   UserIcon,
 } from "./icons";
 
-import { CDN_ASSETS_BASE } from "@/constants/cdn";
 import { destinationAfterAuth } from "@/lib/auth/routeAfterAuth";
 import { useApi } from "@/context/ApiContext";
 import { useAppDispatch } from "@/store";
 import { login, register } from "@/store/apps/auth";
 
-const LOGO_SRC = `${CDN_ASSETS_BASE}/PRO_Movie_Studio_Logo_WHT2021-1769728410816.png`;
+const LOGO_SRC = "/moviestudio.png";
 
 const TRUST_POINTS = [
   "Exclusive independent films & series",
@@ -249,7 +248,7 @@ export default function LoginSignUpPage() {
               width={144}
               height={36}
               priority
-              className="h-9 w-auto object-contain"
+              className="h-9 w-auto object-contain invert"
             />
           </div>
 
@@ -287,7 +286,7 @@ export default function LoginSignUpPage() {
             width={120}
             height={28}
             priority
-            className="h-7 w-auto object-contain"
+            className="h-7 w-auto object-contain invert"
           />
         </div>
         <h1 className="mb-1.5 text-2xl font-black leading-tight text-white">
