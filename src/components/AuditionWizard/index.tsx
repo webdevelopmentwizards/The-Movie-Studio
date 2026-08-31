@@ -10,6 +10,7 @@ import {
   AUDITION_MAX_VIDEO_BYTES,
   AUDITION_MAX_VIDEO_MB,
 } from "@/lib/auditionLimits";
+import { compressImageFile } from "@/lib/imageCompressor";
 import { useApi } from "@/context/ApiContext";
 
 type WizardStep = "projects" | "dialogue" | "video" | "photo";
@@ -288,7 +289,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     setVideoFile(file);
   }
 
-  function selectPhoto(file: File | null) {
+  async function selectPhoto(file: File | null) {
     setPhotoError(null);
     if (!file) {
       setPhotoFile(null);
@@ -299,7 +300,13 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       setPhotoError(`Photo must be ${AUDITION_MAX_PHOTO_MB}MB or smaller.`);
       return;
     }
-    setPhotoFile(file);
+
+    try {
+      const optimized = await compressImageFile(file);
+      setPhotoFile(optimized);
+    } catch {
+      setPhotoFile(file);
+    }
   }
 
   function goNext() {
@@ -619,7 +626,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
 
       {openSynopsis && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-60 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
           onClick={() => setOpenSynopsis(null)}
           role="dialog"
           aria-modal="true"
