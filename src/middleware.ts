@@ -47,6 +47,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)",
+    // Skip Next internals, static files, and the local API rewrite proxy (/__api)
+    // so large audition uploads are not body-buffered by middleware.
+    "/((?!api|__api|_next/static|_next/image|favicon.ico|.*\\..*).*)",
   ],
 };

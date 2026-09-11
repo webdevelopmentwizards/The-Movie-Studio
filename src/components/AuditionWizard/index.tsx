@@ -10,7 +10,6 @@ import {
   AUDITION_MAX_VIDEO_BYTES,
   AUDITION_MAX_VIDEO_MB,
 } from "@/lib/auditionLimits";
-import { compressImageFile } from "@/lib/imageCompressor";
 import { useApi } from "@/context/ApiContext";
 
 type WizardStep = "projects" | "dialogue" | "video" | "photo";
@@ -230,6 +229,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
   const [email, setEmail] = useState("");
   const [rightsAccepted, setRightsAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
@@ -272,6 +272,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     setSubmitError(null);
     setSubmitSuccess(false);
     setIsSubmitting(false);
+    setUploadProgress(0);
     onClose();
   }
 
@@ -289,7 +290,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     setVideoFile(file);
   }
 
-  async function selectPhoto(file: File | null) {
+  function selectPhoto(file: File | null) {
     setPhotoError(null);
     if (!file) {
       setPhotoFile(null);
@@ -300,13 +301,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       setPhotoError(`Photo must be ${AUDITION_MAX_PHOTO_MB}MB or smaller.`);
       return;
     }
-
-    try {
-      const optimized = await compressImageFile(file);
-      setPhotoFile(optimized);
-    } catch {
-      setPhotoFile(file);
-    }
+    setPhotoFile(file);
   }
 
   function goNext() {
@@ -346,6 +341,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
 
     setSubmitError(null);
     setIsSubmitting(true);
+    setUploadProgress(0);
 
     try {
       const formData = new FormData();
@@ -355,14 +351,22 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       formData.append("video", videoFile);
       formData.append("photo", photoFile);
 
-      await audition.submit(formData);
+      await audition.submit(formData, (update) => {
+        if (typeof update === "number") {
+          setUploadProgress(update);
+          return;
+        }
+        setUploadProgress(update.percent);
+      });
 
+      setUploadProgress(100);
       setSubmitSuccess(true);
       toast.success("Audition submitted successfully");
     } catch (err) {
       const message = getErrorMessage(err, "Submission failed.");
       setSubmitError(message);
       toast.error(message);
+      setUploadProgress(0);
     } finally {
       setIsSubmitting(false);
     }
@@ -586,6 +590,32 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                       purposes, without further permission or compensation.
                     </span>
                   </label>
+
+                  {isSubmitting && (
+                    <div
+                      className="space-y-2"
+                      role="progressbar"
+                      aria-valuenow={uploadProgress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label="Upload progress"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium text-zinc-300">
+                          Uploading…
+                        </span>
+                        <span className="tabular-nums font-semibold text-amber-400">
+                          {uploadProgress}%
+                        </span>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-zinc-800">
+                        <div
+                          className="h-full rounded-full bg-amber-500 transition-[width] duration-200 ease-out"
+                          style={{ width: `${uploadProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -616,7 +646,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
             >
               {isLastStep
                 ? isSubmitting
-                  ? "Submitting…"
+                  ? `${uploadProgress}%`
                   : "Submit"
                 : "Continue"}
             </button>
