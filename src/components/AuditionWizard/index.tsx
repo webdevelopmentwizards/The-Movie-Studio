@@ -39,16 +39,26 @@ const PRODUCTIONS: ProductionArtwork[] = [
   {
     id: "american-dream",
     title: "American Dream",
-    status: "Now in Production",
-    posterCard: "/artwork/american-dream-poster-card.jpg",
+    status: "Post Production",
+    posterCard: "/artwork/new-images/american-dream-new-image.jpeg",
     synopsisSheet: "/artwork/american-dream-synopsis.jpg",
     synopsisCard: "/artwork/american-dream-synopsis-card.jpg",
     bannerClassName: "bg-amber-500 text-zinc-950",
   },
   {
+    id: "hope-broker",
+    title: "The Hope Broker",
+    status: "Pre-Production",
+    posterCard: "/artwork/hope-broker-poster-card.jpg",
+    synopsisSheet: "/artwork/hope-broker-synopsis.jpg",
+    synopsisCard: "/artwork/hope-broker-synopsis-card.jpg",
+    bannerClassName:
+      "bg-zinc-950/90 text-amber-300 ring-1 ring-inset ring-amber-500/40",
+  },
+  {
     id: "sway",
     title: "Sway",
-    status: "In Pre-production",
+    status: "Pre-Production",
     posterCard: "/artwork/sway-poster-card.jpg",
     synopsisSheet: "/artwork/sway-synopsis.jpg",
     synopsisCard: "/artwork/sway-synopsis-card.jpg",
@@ -68,10 +78,10 @@ function ProductionPosterCard({
     <button
       type="button"
       onClick={() => onOpenSynopsis(production)}
-      className="group relative w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 text-left transition-colors hover:border-amber-500/50"
+      className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 text-left transition-colors hover:border-amber-500/50"
       aria-label={`${production.title} — ${production.status}. Open synopsis`}
     >
-      <div className="relative aspect-7/9 overflow-hidden bg-zinc-950">
+      <div className="relative aspect-2/3 w-full flex-1 overflow-hidden bg-zinc-950">
         <Image
           src={production.posterCard}
           alt={`${production.title} poster`}
@@ -89,17 +99,17 @@ function ProductionPosterCard({
           sizes="(max-width: 640px) 92vw, 400px"
         />
         <div
-          className={`absolute inset-x-0 top-0 z-10 px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-[0.16em] transition-opacity duration-300 group-hover:opacity-0 group-focus-visible:opacity-0 sm:text-[11px] ${production.bannerClassName}`}
+          className={`absolute inset-x-0 bottom-0 z-10 px-3 py-2 text-center text-[10px] font-bold uppercase tracking-[0.16em] sm:text-[11px] ${production.bannerClassName}`}
         >
           {production.status}
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-linear-to-t from-black/85 to-transparent px-3 py-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 bg-linear-to-b from-black/80 to-transparent px-3 py-3 opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-focus-visible:opacity-100">
           <p className="text-center text-[11px] font-medium text-zinc-100">
             Click for 1-sheet synopsis
           </p>
         </div>
       </div>
-      <div className="border-t border-zinc-800 px-3 py-2.5">
+      <div className="shrink-0 border-t border-zinc-800 px-3 py-2.5">
         <p className="text-sm font-semibold text-zinc-50">{production.title}</p>
         <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-400/80">
           {production.status}
@@ -438,13 +448,21 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                 preview the synopsis, then click it to open the full
                 synopsis.
               </p>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-stretch gap-4 sm:grid-cols-2">
                 {PRODUCTIONS.map((production) => (
-                  <ProductionPosterCard
+                  <div
                     key={production.id}
-                    production={production}
-                    onOpenSynopsis={setOpenSynopsis}
-                  />
+                    className={
+                      production.id === "sway"
+                        ? "sm:col-span-2 sm:mx-auto sm:w-full sm:max-w-md"
+                        : "h-full"
+                    }
+                  >
+                    <ProductionPosterCard
+                      production={production}
+                      onOpenSynopsis={setOpenSynopsis}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
