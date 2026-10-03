@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AUDITION_MAX_PHOTO_BYTES,
@@ -25,6 +25,12 @@ const STEP_LABELS: Record<WizardStep, string> = {
 
 const DUMMY_DIALOGUE = `"I've waited my whole life for this moment. The lights, the camera, the chance to prove I'm more than just a dreamer standing in the shadows. Every rejection, every late night, every doubt — they all led me here. So take a breath, find your truth, and when they call action… give them everything you've got."`;
 
+interface ProductionMediaLinks {
+  epkUrl: string;
+  trailerUrl: string;
+  anthemUrl: string;
+}
+
 interface ProductionArtwork {
   id: string;
   title: string;
@@ -33,7 +39,14 @@ interface ProductionArtwork {
   synopsisSheet: string;
   synopsisCard: string;
   bannerClassName: string;
+  mediaLinks?: ProductionMediaLinks;
 }
+
+const AMERICAN_DREAM_MEDIA: ProductionMediaLinks = {
+  epkUrl: `/american-dream/${encodeURIComponent("American Dream 2026_PressKit_EMAIL.pdf")}`,
+  trailerUrl: `/american-dream/${encodeURIComponent("ad_sizzle_trailer_2026_v1 (720p).mp4")}`,
+  anthemUrl: `/american-dream/${encodeURIComponent("Paulina - American Dream - V2.mp3.mpeg")}`,
+};
 
 const PRODUCTIONS: ProductionArtwork[] = [
   {
@@ -44,6 +57,7 @@ const PRODUCTIONS: ProductionArtwork[] = [
     synopsisSheet: "/artwork/american-dream-synopsis.jpg",
     synopsisCard: "/artwork/american-dream-synopsis-card.jpg",
     bannerClassName: "bg-amber-500 text-zinc-950",
+    mediaLinks: AMERICAN_DREAM_MEDIA,
   },
   {
     id: "hope-broker",
@@ -67,6 +81,398 @@ const PRODUCTIONS: ProductionArtwork[] = [
   },
 ];
 
+function TrailerPopup({
+  src,
+  title,
+  onClose,
+}: {
+  src: string;
+  title: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.stopImmediatePropagation();
+      onClose();
+    }
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-70 flex items-center justify-center bg-black/90 p-3 backdrop-blur-sm sm:p-6"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${title} trailer`}
+    >
+      <div
+        className="relative flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3 sm:px-5">
+          <div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-amber-400">
+              Trailer
+            </p>
+            <h4 className="mt-0.5 text-base font-bold text-zinc-50 sm:text-lg">
+              {title}
+            </h4>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-lg text-zinc-200 transition-colors hover:border-amber-500 hover:text-amber-400"
+            aria-label="Close trailer"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="bg-black">
+          <video
+            key={src}
+            controls
+            playsInline
+            autoPlay
+            className="aspect-video max-h-[80vh] w-full bg-black"
+            src={src}
+          >
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatAudioTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function AnthemPlayer({
+  src,
+  onClose,
+}: {
+  src: string;
+  onClose?: () => void;
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(0.85);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showVolume, setShowVolume] = useState(false);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onLoaded = () => setDuration(audio.duration || 0);
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onEnded = () => setIsPlaying(false);
+
+    audio.addEventListener("timeupdate", onTimeUpdate);
+    audio.addEventListener("loadedmetadata", onLoaded);
+    audio.addEventListener("durationchange", onLoaded);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("ended", onEnded);
+
+    void audio.play().catch(() => setIsPlaying(false));
+
+    return () => {
+      audio.removeEventListener("timeupdate", onTimeUpdate);
+      audio.removeEventListener("loadedmetadata", onLoaded);
+      audio.removeEventListener("durationchange", onLoaded);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, [src]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = volume;
+    audio.muted = isMuted;
+  }, [volume, isMuted]);
+
+  function togglePlay() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      void audio.play().catch(() => setIsPlaying(false));
+    } else {
+      audio.pause();
+    }
+  }
+
+  function seekTo(value: number) {
+    const audio = audioRef.current;
+    if (!audio || !Number.isFinite(value)) return;
+    audio.currentTime = value;
+    setCurrentTime(value);
+  }
+
+  function changeVolume(value: number) {
+    const audio = audioRef.current;
+    setVolume(value);
+    setIsMuted(value === 0);
+    if (audio) {
+      audio.volume = value;
+      audio.muted = value === 0;
+    }
+  }
+
+  function toggleMute() {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    audio.muted = nextMuted;
+    if (!nextMuted && volume === 0) {
+      changeVolume(0.7);
+    }
+  }
+
+  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const volumePercent = (isMuted ? 0 : volume) * 100;
+
+  return (
+    <div className="rounded-xl border border-amber-500/30 bg-zinc-950/90 px-2.5 py-2 sm:px-3">
+      <audio ref={audioRef} src={src} preload="metadata" className="hidden" />
+
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[11px] text-zinc-400">
+          <span className="font-medium text-amber-400">Anthem</span>
+          <span className="mx-1.5 text-zinc-600">·</span>
+          <span className="text-zinc-200">American Dream</span>
+          <span className="mx-1.5 text-zinc-600">·</span>
+          Paulina
+        </p>
+        {onClose && (
+          <button
+            type="button"
+            onClick={() => {
+              audioRef.current?.pause();
+              onClose();
+            }}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-[11px] text-zinc-300 transition-colors hover:border-amber-500 hover:text-amber-400"
+            aria-label="Close anthem player"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-500 text-zinc-950 transition-colors hover:bg-amber-400"
+          aria-label={isPlaying ? "Pause" : "Play"}
+        >
+          {isPlaying ? (
+            <span className="flex items-center gap-0.5" aria-hidden>
+              <span className="h-2.5 w-0.5 rounded-sm bg-zinc-950" />
+              <span className="h-2.5 w-0.5 rounded-sm bg-zinc-950" />
+            </span>
+          ) : (
+            <span
+              className="ml-0.5 border-y-[5px] border-l-[8px] border-y-transparent border-l-zinc-950"
+              aria-hidden
+            />
+          )}
+        </button>
+
+        <span className="w-8 shrink-0 text-right text-[10px] tabular-nums text-zinc-400">
+          {formatAudioTime(currentTime)}
+        </span>
+
+        <input
+          type="range"
+          min={0}
+          max={duration || 0}
+          step={0.1}
+          value={currentTime}
+          onChange={(e) => seekTo(Number(e.target.value))}
+          className="h-1 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-zinc-800 accent-amber-500"
+          style={{
+            background: `linear-gradient(to right, #f59e0b ${progress}%, #27272a ${progress}%)`,
+          }}
+          aria-label="Seek"
+        />
+
+        <span className="w-8 shrink-0 text-[10px] tabular-nums text-zinc-400">
+          {formatAudioTime(duration)}
+        </span>
+
+        <div className="relative ml-0.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowVolume((prev) => !prev)}
+            onDoubleClick={toggleMute}
+            className={`flex h-7 w-7 items-center justify-center rounded-full transition-colors ${
+              showVolume
+                ? "bg-amber-500/15 text-amber-300"
+                : "text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+            }`}
+            aria-label="Volume"
+            aria-expanded={showVolume}
+          >
+            {isMuted || volume === 0 ? (
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden>
+                <path
+                  d="M11 5 6 9H3v6h3l5 4V5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="m16 10 5 5M21 10l-5 5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" aria-hidden>
+                <path
+                  d="M11 5 6 9H3v6h3l5 4V5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M15.5 9.5a4 4 0 0 1 0 5M18.5 7a7 7 0 0 1 0 10"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </button>
+
+          {showVolume && (
+            <div className="absolute bottom-full right-0 z-10 mb-2 flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-2 shadow-xl">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-zinc-400 transition-colors hover:text-amber-400"
+              >
+                {isMuted || volume === 0 ? "Unmute" : "Mute"}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => changeVolume(Number(e.target.value))}
+                className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-zinc-800 accent-amber-500"
+                style={{
+                  background: `linear-gradient(to right, #fbbf24 ${volumePercent}%, #27272a ${volumePercent}%)`,
+                }}
+                aria-label="Volume"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductionMediaLinks({
+  mediaLinks,
+  title,
+  compact,
+}: {
+  mediaLinks: ProductionMediaLinks;
+  title: string;
+  compact?: boolean;
+}) {
+  const [showTrailer, setShowTrailer] = useState(false);
+  const [showAnthem, setShowAnthem] = useState(false);
+  const linkClass = compact
+    ? "text-[10px] font-bold uppercase tracking-[0.16em] transition-colors sm:text-[11px]"
+    : "text-xs font-bold uppercase tracking-[0.18em] transition-colors";
+
+  return (
+    <>
+      <div className={compact ? "mt-3 space-y-3" : "space-y-3"}>
+        <div
+          className={`flex flex-wrap items-center gap-x-4 gap-y-1.5 ${
+            compact ? "" : "justify-center gap-x-5 gap-y-2"
+          }`}
+        >
+          <a
+            href={mediaLinks.epkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${linkClass} text-amber-400 hover:text-amber-300`}
+          >
+            EPK
+          </a>
+          <button
+            type="button"
+            onClick={() => {
+              setShowTrailer(true);
+              setShowAnthem(false);
+            }}
+            className={`${linkClass} ${
+              showTrailer
+                ? "text-amber-300"
+                : "text-amber-400 hover:text-amber-300"
+            }`}
+            aria-expanded={showTrailer}
+          >
+            Trailer
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowAnthem((prev) => !prev);
+              setShowTrailer(false);
+            }}
+            className={`${linkClass} ${
+              showAnthem
+                ? "text-amber-300"
+                : "text-amber-400 hover:text-amber-300"
+            }`}
+            aria-expanded={showAnthem}
+          >
+            American Dream Anthem
+          </button>
+        </div>
+
+        {showAnthem && (
+          <AnthemPlayer
+            src={mediaLinks.anthemUrl}
+            onClose={() => setShowAnthem(false)}
+          />
+        )}
+      </div>
+
+      {showTrailer && (
+        <TrailerPopup
+          src={mediaLinks.trailerUrl}
+          title={title}
+          onClose={() => setShowTrailer(false)}
+        />
+      )}
+    </>
+  );
+}
+
 function ProductionPosterCard({
   production,
   onOpenSynopsis,
@@ -74,14 +480,16 @@ function ProductionPosterCard({
   production: ProductionArtwork;
   onOpenSynopsis: (production: ProductionArtwork) => void;
 }) {
+  const mediaLinks = production.mediaLinks;
+
   return (
-    <button
-      type="button"
-      onClick={() => onOpenSynopsis(production)}
-      className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 text-left transition-colors hover:border-amber-500/50"
-      aria-label={`${production.title} — ${production.status}. Open synopsis`}
-    >
-      <div className="relative aspect-2/3 w-full flex-1 overflow-hidden bg-zinc-950">
+    <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 text-left transition-colors hover:border-amber-500/50">
+      <button
+        type="button"
+        onClick={() => onOpenSynopsis(production)}
+        className="relative aspect-2/3 w-full flex-1 overflow-hidden bg-zinc-950"
+        aria-label={`${production.title} — ${production.status}. Open synopsis`}
+      >
         <Image
           src={production.posterCard}
           alt={`${production.title} poster`}
@@ -108,14 +516,21 @@ function ProductionPosterCard({
             Click for 1-sheet synopsis
           </p>
         </div>
-      </div>
+      </button>
       <div className="shrink-0 border-t border-zinc-800 px-3 py-2.5">
         <p className="text-sm font-semibold text-zinc-50">{production.title}</p>
         <p className="mt-0.5 text-[11px] font-medium uppercase tracking-wide text-amber-400/80">
           {production.status}
         </p>
+        {mediaLinks && (
+          <ProductionMediaLinks
+            mediaLinks={mediaLinks}
+            title={production.title}
+            compact
+          />
+        )}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -258,7 +673,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape" || isSubmitting) return;
       if (openSynopsis) {
-        setOpenSynopsis(null);
+        closeSynopsis();
         return;
       }
       onClose();
@@ -266,6 +681,14 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
     if (isOpen) window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose, isSubmitting, openSynopsis]);
+
+  function closeSynopsis() {
+    setOpenSynopsis(null);
+  }
+
+  function openSynopsisFor(production: ProductionArtwork) {
+    setOpenSynopsis(production);
+  }
 
   function resetAndClose() {
     if (isSubmitting) return;
@@ -460,7 +883,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                   >
                     <ProductionPosterCard
                       production={production}
-                      onOpenSynopsis={setOpenSynopsis}
+                      onOpenSynopsis={openSynopsisFor}
                     />
                   </div>
                 ))}
@@ -675,7 +1098,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
       {openSynopsis && (
         <div
           className="fixed inset-0 z-60 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
-          onClick={() => setOpenSynopsis(null)}
+          onClick={closeSynopsis}
           role="dialog"
           aria-modal="true"
           aria-label={`${openSynopsis.title} synopsis`}
@@ -695,7 +1118,7 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
               </div>
               <button
                 type="button"
-                onClick={() => setOpenSynopsis(null)}
+                onClick={closeSynopsis}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-700 text-zinc-300 transition-colors hover:border-amber-500 hover:text-amber-400"
                 aria-label="Close synopsis"
               >
@@ -711,6 +1134,14 @@ export default function AuditionWizard({ isOpen, onClose }: AuditionWizardProps)
                 className="mx-auto h-auto w-full object-contain"
               />
             </div>
+            {openSynopsis.mediaLinks && (
+              <div className="shrink-0 border-t border-zinc-800 px-4 py-4 sm:px-5">
+                <ProductionMediaLinks
+                  mediaLinks={openSynopsis.mediaLinks}
+                  title={openSynopsis.title}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
