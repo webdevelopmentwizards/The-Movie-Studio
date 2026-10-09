@@ -85,6 +85,11 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
   }, [router.query.plan]);
 
   const plan = MEMBERSHIP_PLANS[planId];
+  const fromApp = useMemo(() => {
+    const raw = router.query.from;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    return value === "app";
+  }, [router.query.from]);
 
   useEffect(() => {
     let cancelled = false;
@@ -187,6 +192,10 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
     if (payMembership.fulfilled.match(result)) {
       clearMemberPending();
       toast.success("Payment successful");
+      if (fromApp) {
+        window.location.href = "themoviestudio://membership/success";
+        return;
+      }
       void router.replace("/dashboard");
       return;
     }
@@ -231,6 +240,11 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
               </span>{" "}
               {plan.period}.
             </p>
+            {fromApp ? (
+              <p className="mt-3 text-sm text-zinc-400">
+                You&apos;ll return to the Movie Studio app after payment.
+              </p>
+            ) : null}
 
             <div className="mt-5 rounded-xl border border-zinc-800 bg-zinc-950/60 px-4 py-3">
               <div className="flex items-center justify-between text-sm">
@@ -352,12 +366,21 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
             </form>
 
             <p className="mt-5 text-center text-xs text-zinc-500">
-              <Link
-                href="/membership"
-                className="text-zinc-400 hover:text-amber-400"
-              >
-                ← Back to plans
-              </Link>
+              {fromApp ? (
+                <a
+                  href="themoviestudio://membership/cancel"
+                  className="text-zinc-400 hover:text-amber-400"
+                >
+                  ← Return to the app
+                </a>
+              ) : (
+                <Link
+                  href="/membership"
+                  className="text-zinc-400 hover:text-amber-400"
+                >
+                  ← Back to plans
+                </Link>
+              )}
             </p>
           </div>
         </div>

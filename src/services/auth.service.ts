@@ -65,6 +65,15 @@ export const authService = {
     return data.data;
   },
 
+  async consumeAppBridge(code: string) {
+    const { data } = await axiosInstance.post<ApiSuccess<AuthPayload>>(
+      "/auth/app-bridge/consume",
+      { code },
+    );
+    setStoredTokens(data.data.tokens);
+    return data.data;
+  },
+
   async logout() {
     try {
       await axiosInstance.post("/auth/logout");

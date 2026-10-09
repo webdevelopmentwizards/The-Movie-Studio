@@ -19,7 +19,7 @@ const poppins = Poppins({
   weight: ["300", "400", "500", "600", "700"],
 });
 
-const BARE_ROUTES = ["/dashboard/pay"];
+const BARE_ROUTES = ["/dashboard/pay", "/auth/app-bridge"];
 
 const NO_FOOTER_ROUTES = ["/dashboard"];
 
