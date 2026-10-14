@@ -26,9 +26,11 @@ const STEP_LABELS: Record<WizardStep, string> = {
 const DUMMY_DIALOGUE = `"I've waited my whole life for this moment. The lights, the camera, the chance to prove I'm more than just a dreamer standing in the shadows. Every rejection, every late night, every doubt — they all led me here. So take a breath, find your truth, and when they call action… give them everything you've got."`;
 
 interface ProductionMediaLinks {
-  epkUrl: string;
-  trailerUrl: string;
-  anthemUrl: string;
+  epkUrl?: string;
+  trailerUrl?: string;
+  anthemUrl?: string;
+  anthemLabel?: string;
+  anthemArtist?: string;
 }
 
 interface ProductionArtwork {
@@ -46,6 +48,18 @@ const AMERICAN_DREAM_MEDIA: ProductionMediaLinks = {
   epkUrl: `/american-dream/${encodeURIComponent("American Dream 2026_PressKit_EMAIL.pdf")}`,
   trailerUrl: `/american-dream/${encodeURIComponent("ad_sizzle_trailer_2026_v1 (720p).mp4")}`,
   anthemUrl: `/american-dream/${encodeURIComponent("Paulina - American Dream - V2.mp3.mpeg")}`,
+  anthemLabel: "American Dream Anthem",
+  anthemArtist: "Paulina",
+};
+
+const HOPE_BROKER_MEDIA: ProductionMediaLinks = {
+  epkUrl: `/the-hope-broker/${encodeURIComponent("The-Hope-Broker-EPK.pdf")}`,
+  anthemUrl: `/the-hope-broker/${encodeURIComponent("The-Hope-Broker.mp3")}`,
+  anthemLabel: "The Hope Broker Anthem",
+};
+
+const SWAY_MEDIA: ProductionMediaLinks = {
+  epkUrl: `/sway/${encodeURIComponent("SWAY Press Kit_EMAIL.pdf")}`,
 };
 
 const PRODUCTIONS: ProductionArtwork[] = [
@@ -68,6 +82,7 @@ const PRODUCTIONS: ProductionArtwork[] = [
     synopsisCard: "/artwork/hope-broker-synopsis-card.jpg",
     bannerClassName:
       "bg-zinc-950/90 text-amber-300 ring-1 ring-inset ring-amber-500/40",
+    mediaLinks: HOPE_BROKER_MEDIA,
   },
   {
     id: "sway",
@@ -78,6 +93,7 @@ const PRODUCTIONS: ProductionArtwork[] = [
     synopsisCard: "/artwork/sway-synopsis-card.jpg",
     bannerClassName:
       "bg-zinc-950/90 text-amber-300 ring-1 ring-inset ring-amber-500/40",
+    mediaLinks: SWAY_MEDIA,
   },
 ];
 
@@ -156,9 +172,13 @@ function formatAudioTime(seconds: number) {
 
 function AnthemPlayer({
   src,
+  title,
+  artist,
   onClose,
 }: {
   src: string;
+  title: string;
+  artist?: string;
   onClose?: () => void;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -254,9 +274,13 @@ function AnthemPlayer({
         <p className="min-w-0 truncate text-[11px] text-zinc-400">
           <span className="font-medium text-amber-400">Anthem</span>
           <span className="mx-1.5 text-zinc-600">·</span>
-          <span className="text-zinc-200">American Dream</span>
-          <span className="mx-1.5 text-zinc-600">·</span>
-          Paulina
+          <span className="text-zinc-200">{title}</span>
+          {artist ? (
+            <>
+              <span className="mx-1.5 text-zinc-600">·</span>
+              {artist}
+            </>
+          ) : null}
         </p>
         {onClose && (
           <button
@@ -405,6 +429,7 @@ function ProductionMediaLinks({
   const linkClass = compact
     ? "text-[10px] font-bold uppercase tracking-[0.16em] transition-colors sm:text-[11px]"
     : "text-xs font-bold uppercase tracking-[0.18em] transition-colors";
+  const anthemTitle = mediaLinks.anthemLabel ?? `${title} Anthem`;
 
   return (
     <>
@@ -414,55 +439,63 @@ function ProductionMediaLinks({
             compact ? "" : "justify-center gap-x-5 gap-y-2"
           }`}
         >
-          <a
-            href={mediaLinks.epkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`${linkClass} text-amber-400 hover:text-amber-300`}
-          >
-            EPK
-          </a>
-          <button
-            type="button"
-            onClick={() => {
-              setShowTrailer(true);
-              setShowAnthem(false);
-            }}
-            className={`${linkClass} ${
-              showTrailer
-                ? "text-amber-300"
-                : "text-amber-400 hover:text-amber-300"
-            }`}
-            aria-expanded={showTrailer}
-          >
-            Trailer
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setShowAnthem((prev) => !prev);
-              setShowTrailer(false);
-            }}
-            className={`${linkClass} ${
-              showAnthem
-                ? "text-amber-300"
-                : "text-amber-400 hover:text-amber-300"
-            }`}
-            aria-expanded={showAnthem}
-          >
-            American Dream Anthem
-          </button>
+          {mediaLinks.epkUrl && (
+            <a
+              href={mediaLinks.epkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${linkClass} text-amber-400 hover:text-amber-300`}
+            >
+              EPK
+            </a>
+          )}
+          {mediaLinks.trailerUrl && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowTrailer(true);
+                setShowAnthem(false);
+              }}
+              className={`${linkClass} ${
+                showTrailer
+                  ? "text-amber-300"
+                  : "text-amber-400 hover:text-amber-300"
+              }`}
+              aria-expanded={showTrailer}
+            >
+              Trailer
+            </button>
+          )}
+          {mediaLinks.anthemUrl && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowAnthem((prev) => !prev);
+                setShowTrailer(false);
+              }}
+              className={`${linkClass} ${
+                showAnthem
+                  ? "text-amber-300"
+                  : "text-amber-400 hover:text-amber-300"
+              }`}
+              aria-expanded={showAnthem}
+            >
+              {anthemTitle}
+            </button>
+          )}
         </div>
 
-        {showAnthem && (
+        {showAnthem && mediaLinks.anthemUrl && (
           <AnthemPlayer
             src={mediaLinks.anthemUrl}
+            title={title}
+            artist={mediaLinks.anthemArtist}
             onClose={() => setShowAnthem(false)}
           />
         )}
       </div>
 
-      {showTrailer && (
+      {showTrailer && mediaLinks.trailerUrl && (
         <TrailerPopup
           src={mediaLinks.trailerUrl}
           title={title}
