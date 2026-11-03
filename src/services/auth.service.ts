@@ -46,6 +46,16 @@ export type RegisterInput = {
   phoneNumber?: string;
 };
 
+export type ForgotPasswordInput = {
+  email: string;
+};
+
+export type ResetPasswordInput = {
+  email: string;
+  otp: string;
+  password: string;
+};
+
 export const authService = {
   async login(input: LoginInput) {
     const { data } = await axiosInstance.post<ApiSuccess<AuthPayload>>(
@@ -90,5 +100,21 @@ export const authService = {
       requiresPlan: nested.requiresPlan,
       isMember: nested.isMember,
     };
+  },
+
+  async forgotPassword(input: ForgotPasswordInput) {
+    const { data } = await axiosInstance.post<ApiSuccess<null>>(
+      "/auth/forgot-password",
+      input,
+    );
+    return data;
+  },
+
+  async resetPassword(input: ResetPasswordInput) {
+    const { data } = await axiosInstance.post<ApiSuccess<null>>(
+      "/auth/reset-password",
+      input,
+    );
+    return data;
   },
 };

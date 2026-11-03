@@ -13,6 +13,8 @@ export type {
   AuthMeData,
   LoginInput,
   RegisterInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
 } from "@/services/auth.service";
 
 export { contactService } from "@/services/contact.service";

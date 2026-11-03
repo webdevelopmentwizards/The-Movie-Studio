@@ -18,17 +18,18 @@ export const AUTH_STORAGE_KEYS = {
  *
  * - Unauthenticated users cannot open private routes → redirected to login
  * - Authenticated users can browse the whole app
- * - Authenticated users hitting login/signup → redirected away (home)
+ * - Authenticated users hitting login/signup/forgot-password → redirected away (home)
  */
 
 /** Auth required — `pages/dashboard/**` (pay included) */
 export const PROTECTED_PREFIXES = ["/dashboard"] as const;
 
 /** Auth pages only for logged-out users */
-export const GUEST_PATHS = ["/login", "/signup"] as const;
+export const GUEST_PATHS = ["/login", "/signup", "/forgot-password"] as const;
 
 export const LOGIN_PATH = "/login";
 export const SIGNUP_PATH = "/signup";
+export const FORGOT_PASSWORD_PATH = "/forgot-password";
 export const HOME_PATH = "/";
 export const PLANS_PATH = "/plans";
 export const DASHBOARD_PATH = "/dashboard";

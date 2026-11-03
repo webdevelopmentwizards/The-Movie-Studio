@@ -388,13 +388,13 @@ export default function LoginSignUpPage() {
                 <div className="mb-1.5 flex items-center justify-between">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
                   {mode === "login" && (
-                    <button
-                      type="button"
+                    <Link
+                      href="/forgot-password"
                       className="cursor-pointer border-none bg-transparent p-0 text-[11px] font-bold text-[#5DB9BF] lg:text-xs"
                     >
                       <span className="lg:hidden">Forgot?</span>
                       <span className="hidden lg:inline">Forgot password?</span>
-                    </button>
+                    </Link>
                   )}
                 </div>
                 <InputShell>

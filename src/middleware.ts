@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Guest-only: /login, /signup — logged-in users leave these pages
+  // Guest-only: /login, /signup, /forgot-password — logged-in users leave these pages
   if (isGuestPath(pathname) && isAuthenticated) {
     const dest = request.nextUrl.clone();
     const next = safeNextPath(

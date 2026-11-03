@@ -162,7 +162,7 @@ export default function Login() {
                       Password
                     </label>
                     <Link
-                      href="#"
+                      href="/forgot-password"
                       className="text-xs font-medium text-amber-400 transition-colors hover:text-amber-300"
                     >
                       Forgot password?
