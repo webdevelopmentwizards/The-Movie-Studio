@@ -117,4 +117,14 @@ export const authService = {
     );
     return data;
   },
+
+  /** App → website handoff. Trades a one-time code for a web session. */
+  async consumeAppBridge(code: string) {
+    const { data } = await axiosInstance.post<ApiSuccess<AuthPayload>>(
+      "/auth/app-bridge/consume",
+      { code },
+    );
+    setStoredTokens(data.data.tokens);
+    return data.data;
+  },
 };

@@ -100,7 +100,8 @@ axiosInstance.interceptors.response.use(
           url.includes("/auth/signup") ||
           url.includes("/auth/register") ||
           url.includes("/auth/forgot-password") ||
-          url.includes("/auth/reset-password");
+          url.includes("/auth/reset-password") ||
+          url.includes("/auth/app-bridge");
 
         if (!isAuthEndpoint) {
           clearStoredTokens();

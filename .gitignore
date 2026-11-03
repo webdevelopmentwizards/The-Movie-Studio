@@ -39,9 +39,6 @@ yarn-error.log*
 .env*.local
 !.env.example
 
-# local HTTPS certs (next dev --experimental-https / mkcert)
-/certificates
-
 # audition uploads (videos / photos)
 /uploads
 

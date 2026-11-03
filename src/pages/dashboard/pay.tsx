@@ -84,7 +84,21 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
     return isMembershipPlanId(value) ? value : "yearly";
   }, [router.query.plan]);
 
+  const fromApp = useMemo(() => {
+    const raw = router.query.from;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    return value === "app";
+  }, [router.query.from]);
+
   const plan = MEMBERSHIP_PLANS[planId];
+
+  function returnToApp(outcome: "success" | "cancel") {
+    const uri =
+      outcome === "success"
+        ? "themoviestudio://membership/success"
+        : "themoviestudio://membership/cancel";
+    window.location.href = uri;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -187,6 +201,10 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
     if (payMembership.fulfilled.match(result)) {
       clearMemberPending();
       toast.success("Payment successful");
+      if (fromApp) {
+        returnToApp("success");
+        return;
+      }
       void router.replace("/dashboard");
       return;
     }
@@ -352,12 +370,22 @@ export default function MembershipPayPage(_props: SsrAuthProps) {
             </form>
 
             <p className="mt-5 text-center text-xs text-zinc-500">
-              <Link
-                href="/membership"
-                className="text-zinc-400 hover:text-amber-400"
-              >
-                ← Back to plans
-              </Link>
+              {fromApp ? (
+                <button
+                  type="button"
+                  onClick={() => returnToApp("cancel")}
+                  className="text-zinc-400 hover:text-amber-400"
+                >
+                  ← Cancel and return to app
+                </button>
+              ) : (
+                <Link
+                  href="/membership"
+                  className="text-zinc-400 hover:text-amber-400"
+                >
+                  ← Back to plans
+                </Link>
+              )}
             </p>
           </div>
         </div>

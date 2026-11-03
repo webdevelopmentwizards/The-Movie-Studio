@@ -33,6 +33,7 @@ const nextConfig: NextConfig = {
       { source: "/guest/login", destination: "/login", permanent: true },
       { source: "/guest/signup", destination: "/signup", permanent: true },
       { source: "/guest/auth", destination: "/login", permanent: true },
+      // Exact /auth only — /auth/app-bridge is a real page for mobile payment handoff
       { source: "/auth", destination: "/login", permanent: true },
       {
         source: "/membership/dashboard",
